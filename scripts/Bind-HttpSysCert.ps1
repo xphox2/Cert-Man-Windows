@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Post-renewal hook: (re)bind a renewed certificate to an HTTP.SYS endpoint via netsh.
 

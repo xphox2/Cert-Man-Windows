@@ -1,0 +1,24 @@
+flowchart TD
+    A([Host serves a cert from any source:<br/>self-signed default / GoDaddy / DigiCert / other]) --> B[Step 0 - Inventory<br/>scripts/Inventory-Certs.ps1]
+    B --> C{Validation method?}
+    C -->|"Wildcard / internal"| D1[DNS-01 — Runbook 02]
+    C -->|"Public host, port 80 open"| D2[HTTP-01 — Runbook 01]
+    D1 --> E[Issue + bind Let's Encrypt<br/>rebinds existing HTTPS binding]
+    D2 --> E
+    E --> F[Verify served cert = Let's Encrypt, trusted]
+    F --> G{Old thumbprint still<br/>referenced elsewhere?}
+    G -->|Yes| H[Update those refs first<br/>or leave old cert in place]
+    G -->|No| I[Remove old cert<br/>scripts/Remove-OldCert.ps1]
+    H --> J
+    I --> J[Add host to monitoring<br/>Runbook 06]
+    J --> K([Done — now auto-renews, vendor-free])
+    F -.->|"problem during cutover"| R[Rollback: re-bind old thumbprint]
+
+    classDef act fill:#1f6feb,stroke:#0b3d91,color:#ffffff;
+    classDef dec fill:#fff3cd,stroke:#d39e00,color:#000000;
+    classDef ok fill:#1a7f37,stroke:#0b3d20,color:#ffffff,font-weight:bold;
+    classDef warn fill:#f8d7da,stroke:#b02a37,color:#000000;
+    class B,D1,D2,E,F,I,J act;
+    class C,G dec;
+    class H,R warn;
+    class K ok;

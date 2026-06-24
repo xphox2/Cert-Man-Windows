@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Post-renewal hook: enable a renewed certificate for Exchange Server services and restart them.
 

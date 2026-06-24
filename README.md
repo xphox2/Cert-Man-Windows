@@ -57,8 +57,11 @@ flowchart TD
 | Azure Web App — single app, low maintenance | **[04](04-Azure-Acmebot-Runbook.md)** | App Service Acmebot | DNS-01 |
 | Azure — cert shared across App Service + Front Door + App Gateway | **[04](04-Azure-Acmebot-Runbook.md)** | Key Vault Acmebot | DNS-01 |
 | Azure — scripted/runbook approach, no Functions app | **[05](05-Azure-PoshACME-Runbook.md)** | Posh-ACME + Automation | DNS-01 |
+| Host already serves a cert from **another CA or a self-signed default** | **[08](08-Replacing-Existing-Certs.md)** (+ 01/02/03) | win-acme | per host |
 
 > **Wildcard certificates (`*.example.com`) always require DNS-01.** HTTP-01 cannot issue wildcards. If you need a wildcard, you are on a DNS-01 runbook (02, 04, or 05).
+>
+> **Replacing an existing certificate?** Whether it's a GoDaddy/DigiCert cert nearing expiry or the default IIS self-signed cert, the source CA is irrelevant — Let's Encrypt issues fresh and re-binds. Follow your issuance runbook (01/02) plus **[Runbook 08](08-Replacing-Existing-Certs.md)** for the safe cutover and cleanup.
 
 ---
 
@@ -84,7 +87,8 @@ flowchart TD
 | [05-Azure-PoshACME-Runbook.md](05-Azure-PoshACME-Runbook.md) | Alternative Azure path — Posh-ACME + Azure Automation runbook. |
 | [06-Monitoring-and-Alerting.md](06-Monitoring-and-Alerting.md) | Dual-layer monitoring, alert thresholds, expiry checks. |
 | [07-Operations-and-Troubleshooting.md](07-Operations-and-Troubleshooting.md) | Incident runbook, failure modes, gotchas, rate-limit recovery, staging→prod cutover. |
-| [scripts/](scripts/) | Ready-to-run PowerShell: install, deploy-to-service, monitoring, Posh-ACME renewal. |
+| [08-Replacing-Existing-Certs.md](08-Replacing-Existing-Certs.md) | **Vendor-agnostic migration** — take over a self-signed/default, GoDaddy, DigiCert, or any cert with Let's Encrypt. Cross-cutting companion to 01/02/03. |
+| [scripts/](scripts/) | Ready-to-run PowerShell: install, deploy-to-service, monitoring, Posh-ACME renewal, cert inventory + safe removal (migration). |
 | [docs/diagrams/](docs/diagrams/) | All flow diagrams (Mermaid source + SVG/PNG exports) for training and slides. |
 | [docs/training-deck/](docs/training-deck/) | Print-ready [training deck PDF](docs/training-deck/SSL-Cert-Rotation-Training-Deck.pdf) — every diagram in order, one per slide. |
 | [CHANGELOG.md](CHANGELOG.md) | Handbook version history. |

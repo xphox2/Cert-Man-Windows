@@ -64,7 +64,7 @@
     <div class="header"><span class="num">Start here</span><span class="ttl">Which runbook do I use?</span></div>
     <div class="caption">Pick the right path for any certificate based on what needs it and how it's exposed.</div>
     <div class="figure"><img src="../diagrams/master-decision-flow.svg" alt="Master decision flow"></div>
-    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>1 / 8</span></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>1 / 9</span></div>
   </section>
 
   <!-- 2 — Runbook 01 -->
@@ -72,7 +72,7 @@
     <div class="header"><span class="num">Runbook 01</span><span class="ttl">Windows IIS — HTTP-01</span></div>
     <div class="caption">Public IIS website, port 80 reachable, no wildcard. win-acme issues, binds, and auto-renews.</div>
     <div class="figure"><img src="../diagrams/runbook01-iis-http01.svg" alt="IIS HTTP-01 process"></div>
-    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>2 / 8</span></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>2 / 9</span></div>
   </section>
 
   <!-- 3 — Runbook 02 -->
@@ -80,7 +80,7 @@
     <div class="header"><span class="num">Runbook 02</span><span class="ttl">Windows DNS-01 &amp; Wildcard</span></div>
     <div class="caption">Wildcard, internal host, or port 80 blocked. Validate via the DNS provider's API.</div>
     <div class="figure"><img src="../diagrams/runbook02-dns01.svg" alt="DNS-01 / wildcard process"></div>
-    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>3 / 8</span></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>3 / 9</span></div>
   </section>
 
   <!-- 4 — CNAME delegation -->
@@ -88,7 +88,7 @@
     <div class="header"><span class="num">Runbook 02 &sect;A</span><span class="ttl">CNAME Delegation (on-prem DNS)</span></div>
     <div class="caption">Internal/API-less DNS? Delegate only the _acme-challenge record to an API-capable zone.</div>
     <div class="figure"><img src="../diagrams/cname-delegation.svg" alt="CNAME delegation"></div>
-    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>4 / 8</span></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>4 / 9</span></div>
   </section>
 
   <!-- 5 — Runbook 03 -->
@@ -96,7 +96,7 @@
     <div class="header"><span class="num">Runbook 03</span><span class="ttl">Non-IIS Services</span></div>
     <div class="caption">RDP, SQL Server, Exchange, custom HTTP.SYS: renew, then a post-renewal script re-binds &amp; restarts.</div>
     <div class="figure"><img src="../diagrams/runbook03-noniis-model.svg" alt="Non-IIS renewal-to-deploy model"></div>
-    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>5 / 8</span></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>5 / 9</span></div>
   </section>
 
   <!-- 6 — Runbook 04 -->
@@ -104,7 +104,7 @@
     <div class="header"><span class="num">Runbook 04</span><span class="ttl">Azure Web App — Acmebot (primary)</span></div>
     <div class="caption">Managed, hands-off: cert lands in Key Vault, App Service auto-imports within 24h.</div>
     <div class="figure"><img src="../diagrams/runbook04-acmebot-arch.svg" alt="Acmebot architecture"></div>
-    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>6 / 8</span></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>6 / 9</span></div>
   </section>
 
   <!-- 7 — Runbook 05 -->
@@ -112,7 +112,7 @@
     <div class="header"><span class="num">Runbook 05</span><span class="ttl">Azure Web App — Posh-ACME (alternative)</span></div>
     <div class="caption">Scripted path: an Azure Automation runbook issues, uploads to Key Vault, and persists state.</div>
     <div class="figure"><img src="../diagrams/runbook05-poshacme-arch.svg" alt="Posh-ACME + Automation architecture"></div>
-    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>7 / 8</span></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>7 / 9</span></div>
   </section>
 
   <!-- 8 — Runbook 06 -->
@@ -120,7 +120,15 @@
     <div class="header"><span class="num">Runbook 06</span><span class="ttl">Monitoring &amp; Alerting</span></div>
     <div class="caption">Automation fails silently — dual-layer monitoring catches both the outage and its cause.</div>
     <div class="figure"><img src="../diagrams/monitoring-dual-layer.svg" alt="Dual-layer monitoring"></div>
-    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>8 / 8</span></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>8 / 9</span></div>
+  </section>
+
+  <!-- 9 — Runbook 08 (vendor-agnostic replacement) -->
+  <section class="slide">
+    <div class="header"><span class="num">Runbook 08</span><span class="ttl">Replacing an Existing Cert (any vendor)</span></div>
+    <div class="caption">Take over a self-signed default, GoDaddy, DigiCert, or any cert: Let's Encrypt issues fresh and re-binds. Inventory &rarr; cutover &rarr; clean up.</div>
+    <div class="figure"><img src="../diagrams/runbook08-replace-existing.svg" alt="Vendor-agnostic certificate replacement flow"></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>9 / 9</span></div>
   </section>
 
 </body>

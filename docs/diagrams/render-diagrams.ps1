@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Re-render every Mermaid source (src\*.mmd) to SVG and high-res PNG.
 

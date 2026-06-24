@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Independent TLS certificate expiry monitor (Layer 1 of Runbook 06).
 

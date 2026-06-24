@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Post-renewal hook: bind a renewed certificate to RDP (Remote Desktop) and restart the service.
 

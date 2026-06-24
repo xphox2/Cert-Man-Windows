@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Post-renewal hook: bind a renewed certificate to a SQL Server instance for TLS, grant the
     SQL service account read on the private key, and restart the instance.

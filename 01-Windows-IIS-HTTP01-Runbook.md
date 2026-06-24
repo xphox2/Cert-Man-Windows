@@ -6,6 +6,8 @@
 **Result:** Certificate issued, bound to the IIS site, and a Windows Scheduled Task created that renews and re-binds automatically — no further action.
 
 > Not your scenario? Internal site / port 80 blocked / wildcard → **[02](02-Windows-DNS01-Wildcard.md)**. Non-IIS service → **[03](03-Windows-NonIIS-Services.md)**.
+>
+> **Replacing a cert that's already on this site** (default self-signed, GoDaddy, DigiCert, any vendor)? This runbook still applies — win-acme re-binds the existing HTTPS binding to the new Let's Encrypt cert. Pair it with **[08](08-Replacing-Existing-Certs.md)** for the inventory, safe cutover, and old-cert cleanup.
 
 ---
 

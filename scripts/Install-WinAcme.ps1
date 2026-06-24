@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Bootstrap win-acme on a Windows Server: download the latest release, extract,
     unblock the DLLs, and write a baseline settings.json.

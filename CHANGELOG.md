@@ -2,6 +2,18 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.3] — 2026-06-24
+
+### Added
+- **`08-Replacing-Existing-Certs.md`** — vendor-agnostic migration runbook: take over a self-signed/default IIS cert, a GoDaddy/DigiCert/Sectigo/any commercial cert, or an imported wildcard with Let's Encrypt. Covers the key principle (ACME issues fresh and re-binds — prior CA is irrelevant), no-downtime cutover, safe cleanup, rollback, and the CA-change pinning trap. Cross-cutting companion to Runbooks 01/02/03.
+- **`scripts/Inventory-Certs.ps1`** — lists every cert in `LocalMachine\My` with issuer/source label, expiry, thumbprint, and what references it (IIS bindings, HTTP.SYS, RDP) — the pre-flight safety check before replacing/removing a cert.
+- **`scripts/Remove-OldCert.ps1`** — safely removes a superseded cert: refuses to delete while it's still referenced (unless `-Force`), backs it up first.
+- New replacement-flow diagram (`docs/diagrams/runbook08-replace-existing.*`) and a 9th training-deck slide; deck PDF rebuilt.
+
+### Changed
+- README decision flow/lookup and Runbooks 01 & 02 now cross-link Runbook 08 for "replacing an existing cert" scenarios.
+- All `scripts/*.ps1` re-saved as **UTF-8 with BOM** so Windows PowerShell 5.1 parses non-ASCII characters correctly on the server.
+
 ## [0.1.2] — 2026-06-24
 
 ### Added
