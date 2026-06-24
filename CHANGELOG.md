@@ -2,6 +2,12 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.11] — 2026-06-24
+
+### Changed
+- **Consolidated the IIS workflow into one script, `setup-iis.ps1`** (root, `irm | iex`). It is the step after the preflight: validates IIS (installs the role if missing) and win-acme, scans all sites/bindings, plans the minimum set of wildcard certs (shared parents collapse onto one cert; apex as SAN; multi-level gets its own `*.sub`; PSL-aware), checks existing coverage, and — if everything checks out — **offers to generate the missing certs on the live (production) Let's Encrypt server** (DNS-01, provider chosen once) and bind each covered host to its IIS site.
+- **Removed** `plan-certs.ps1` and `scripts/Setup-IIS.ps1` — both folded into `setup-iis.ps1`. README, Runbook 01 Step 0, and Runbook 02 updated to the two-step flow (preflight → setup-iis).
+
 ## [0.1.10] — 2026-06-24
 
 ### Added

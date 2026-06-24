@@ -53,19 +53,17 @@ flowchart TD
 
 ---
 
-## Step 0 — Preflight + IIS setup (run first on a fresh box)
-
-Two small, focused scripts:
+## Step 0 — Preflight, then the IIS script (run first on a fresh box)
 
 ```powershell
-# 1) Install/repair IIS (role + module), optionally create a site with host bindings:
-& "E:\NOC\SSL_Rotation_Windows\scripts\Setup-IIS.ps1" -SiteName MySite -HostNames www.example.com
-
-# 2) Validate ACME + DNS and install win-acme (interactive one-liner):
+# 1) Validate ACME + DNS and install win-acme:
 irm https://xphox2.github.io/Cert-Man-Windows/preflight.ps1 | iex
+
+# 2) Once READY: validate IIS, plan certs, and generate them:
+irm https://xphox2.github.io/Cert-Man-Windows/setup-iis.ps1 | iex
 ```
 
-The **preflight** is scoped to ACME + DNS only (internet to Let's Encrypt, win-acme pluggable build, optional DNS-01 test). The **IIS** concern is its own script, `Setup-IIS.ps1`. When the preflight prints **READY** and win-acme is installed, you can **skip Step 1**.
+The **preflight** is scoped to ACME + DNS (internet to Let's Encrypt, win-acme pluggable build, optional DNS-01 test). The **IIS script** (`setup-iis.ps1`) installs the IIS role if missing, scans your sites, plans the wildcard certs, and offers to generate them live. When the preflight prints **READY** and win-acme is installed, you can **skip Step 1** below.
 
 ## Step 1 — Install win-acme
 

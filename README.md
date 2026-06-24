@@ -6,25 +6,27 @@
 
 ---
 
-## ⚡ Quick start — preflight a fresh server
+## ⚡ Quick start
 
-On a new Windows/IIS box, open **PowerShell** and run:
+Two steps, both `irm | iex` one-liners (each self-elevates into a clean window).
+
+**Step 1 — Preflight** (validate ACME + DNS, install win-acme):
 
 ```powershell
 irm https://xphox2.github.io/Cert-Man-Windows/preflight.ps1 | iex
 ```
 
-<sub>Served via GitHub Pages. Fallback if Pages is unavailable: `irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex`</sub>
+It checks **ACME + DNS** with simple pass/fail output, **offers to auto-fix** what's missing (installs the win-acme pluggable build), loops until green, then optionally runs a **real DNS-01 validation test** against Let's Encrypt staging. When it says **READY**, move to step 2.
 
-**Already have IIS sites configured?** See which wildcard certs you need (it groups host names that share a parent domain into one cert, and shows what's already covered):
+**Step 2 — IIS certificates** (scan sites, plan wildcards, generate):
 
 ```powershell
-irm https://xphox2.github.io/Cert-Man-Windows/plan-certs.ps1 | iex
+irm https://xphox2.github.io/Cert-Man-Windows/setup-iis.ps1 | iex
 ```
 
-It self-elevates (in a clean window), checks **ACME + DNS** with simple pass/fail output, **offers to auto-fix** what's missing (installs the win-acme pluggable build), loops until green, then optionally runs a **real DNS-01 validation test** against Let's Encrypt staging to prove wildcard issuance works. When it says **READY**, jump to your runbook below.
+It validates IIS (installs the role if missing), scans every site/binding, groups host names into the **minimum set of wildcard certs** (names sharing a parent domain collapse onto one cert; the apex becomes a SAN), shows what's already covered, and — if all checks out — **offers to generate the missing certs on the live Let's Encrypt server** and bind them to IIS.
 
-> The preflight is intentionally scoped to ACME + DNS. **IIS setup is its own script** — run [`scripts/Setup-IIS.ps1`](scripts/Setup-IIS.ps1) (installs the role + module, optionally creates a site/bindings). A non-interactive/scriptable preflight is also available: [`scripts/Preflight-Check.ps1`](scripts/Preflight-Check.ps1).
+<sub>Served via GitHub Pages. Raw fallback: `irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex` (and `.../setup-iis.ps1`). A non-interactive/scriptable preflight is also available: [`scripts/Preflight-Check.ps1`](scripts/Preflight-Check.ps1).</sub>
 
 ---
 
@@ -110,8 +112,9 @@ flowchart TD
 | [06-Monitoring-and-Alerting.md](06-Monitoring-and-Alerting.md) | Dual-layer monitoring, alert thresholds, expiry checks. |
 | [07-Operations-and-Troubleshooting.md](07-Operations-and-Troubleshooting.md) | Incident runbook, failure modes, gotchas, rate-limit recovery, staging→prod cutover. |
 | [08-Replacing-Existing-Certs.md](08-Replacing-Existing-Certs.md) | **Vendor-agnostic migration** — take over a self-signed/default, GoDaddy, DigiCert, or any cert with Let's Encrypt. Cross-cutting companion to 01/02/03. |
-| [plan-certs.ps1](plan-certs.ps1) | **Wildcard planner** — scans IIS, groups host names into the minimum set of wildcard certs (collapsing shared parents), shows coverage + the win-acme commands. Run via `irm .../plan-certs.ps1 \| iex`. |
-| [scripts/](scripts/) | Ready-to-run PowerShell: **preflight (ACME+DNS)**, **IIS setup**, win-acme install, deploy-to-service, monitoring, Posh-ACME renewal, cert inventory + safe removal (migration). |
+| [preflight.ps1](preflight.ps1) | **Preflight** (ACME + DNS) — validate + auto-install win-acme, optional DNS-01 staging test. `irm .../preflight.ps1 \| iex` |
+| [setup-iis.ps1](setup-iis.ps1) | **IIS certificate setup** — validate IIS, scan sites, plan wildcard certs (collapsing shared parents), then generate + bind on live Let's Encrypt. `irm .../setup-iis.ps1 \| iex` |
+| [scripts/](scripts/) | Ready-to-run PowerShell: win-acme install, deploy-to-service, monitoring, Posh-ACME renewal, cert inventory + safe removal (migration), scriptable preflight. |
 | [docs/diagrams/](docs/diagrams/) | All flow diagrams (Mermaid source + SVG/PNG exports) for training and slides. |
 | [docs/training-deck/](docs/training-deck/) | Print-ready [training deck PDF](docs/training-deck/SSL-Cert-Rotation-Training-Deck.pdf) — every diagram in order, one per slide. |
 | [CHANGELOG.md](CHANGELOG.md) | Handbook version history. |
