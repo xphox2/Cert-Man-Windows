@@ -1,0 +1,18 @@
+flowchart TD
+    S["Azure Automation runbook<br/>scheduled daily"] -->|Posh-ACME| LE["Let's Encrypt"]
+    S -->|"write TXT (DNS-01)"| DNS[("Azure DNS")]
+    DNS -->|validated| LE
+    LE -->|cert issued| S
+    S -->|upload PFX| KV[("Azure Key Vault")]
+    KV -->|"auto-import within 24h"| APP[App Service]
+    S -->|persist state| BLOB[("Azure Storage<br/>Posh-ACME state")]
+    APP --> Client([HTTPS to clients])
+
+    classDef act fill:#1f6feb,stroke:#0b3d91,color:#ffffff;
+    classDef vault fill:#fde68a,stroke:#b45309,color:#000000;
+    classDef ext fill:#dbeafe,stroke:#1e40af,color:#000000;
+    classDef ok fill:#1a7f37,stroke:#0b3d20,color:#ffffff,font-weight:bold;
+    class S,APP act;
+    class KV,DNS,BLOB vault;
+    class LE ext;
+    class Client ok;

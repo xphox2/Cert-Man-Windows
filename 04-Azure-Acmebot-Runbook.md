@@ -24,25 +24,29 @@ Both deploy the same way, support wildcards/SANs, DNS-01, a dashboard, and ARI-a
 
 ## Architecture
 
+```mermaid
+flowchart TD
+    U["Operator: create cert order<br/>dashboard / API"] --> F[Acmebot Function App]
+    F -->|ACME order| LE["Let's Encrypt"]
+    F -->|"write _acme-challenge TXT (DNS-01)"| DNS[("Azure DNS / Cloudflare")]
+    DNS -->|validated| LE
+    LE -->|cert issued| KV[("Azure Key Vault")]
+    F --> KV
+    KV -->|"auto-import within 24h, no downtime"| APP["App Service /<br/>Front Door / App Gateway"]
+    APP --> Client([HTTPS to clients])
+    F -. "daily ARI renewal — rate-limit exempt" .-> LE
+
+    classDef act fill:#1f6feb,stroke:#0b3d91,color:#ffffff;
+    classDef vault fill:#fde68a,stroke:#b45309,color:#000000;
+    classDef ext fill:#dbeafe,stroke:#1e40af,color:#000000;
+    classDef ok fill:#1a7f37,stroke:#0b3d20,color:#ffffff,font-weight:bold;
+    class U,F,APP act;
+    class KV,DNS vault;
+    class LE ext;
+    class Client ok;
 ```
-   Dashboard / API (you create a cert order)
-            │
-            ▼
-   Acmebot Function App ──ACME──► Let's Encrypt
-            │  writes _acme-challenge TXT (DNS-01)
-            ▼
-        Azure DNS (or Cloudflare, etc.)
-            │  validated
-            ▼
-   Cert issued ──► stored in Azure Key Vault (PFX)
-            │
-            ▼
-   App Service / Front Door / App Gateway
-   auto-import the cert from Key Vault (≤24h, no downtime)
-            │
-            ▼
-   Daily Acmebot timer re-checks & renews via ARI (rate-limit exempt)
-```
+
+> 📊 **Slide-ready image:** [PNG](docs/diagrams/runbook04-acmebot-arch.png) · [SVG](docs/diagrams/runbook04-acmebot-arch.svg)
 
 ---
 

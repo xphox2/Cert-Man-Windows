@@ -15,21 +15,27 @@
 
 ## The model
 
+```mermaid
+flowchart TD
+    A["win-acme / Posh-ACME renews the cert<br/>(DNS-01)"] --> B["New cert lands in LocalMachine\My<br/>with a new thumbprint"]
+    B --> C[Post-renewal SCRIPT runs automatically]
+    C --> S1[1 - import PFX if needed]
+    C --> S2[2 - bind new thumbprint to the service]
+    C --> S3[3 - restart / reload the service]
+    S1 --> D[Service now serves the renewed cert]
+    S2 --> D
+    S3 --> D
+    D --> E([Hands-off])
+
+    classDef act fill:#1f6feb,stroke:#0b3d91,color:#ffffff;
+    classDef script fill:#ede9fe,stroke:#6d28d9,color:#000000;
+    classDef ok fill:#1a7f37,stroke:#0b3d20,color:#ffffff,font-weight:bold;
+    class A,B,D act;
+    class C,S1,S2,S3 script;
+    class E ok;
 ```
- win-acme / Posh-ACME renews the cert  (DNS-01)
-                  │
-                  ▼
- New cert lands in LocalMachine\My  (new thumbprint)
-                  │
-                  ▼
- Post-renewal SCRIPT runs automatically:
-   1. (import PFX if needed)
-   2. bind new thumbprint to the service
-   3. restart / reload the service
-                  │
-                  ▼
- Service now serves the renewed cert — hands-off
-```
+
+> 📊 **Slide-ready image:** [PNG](docs/diagrams/runbook03-noniis-model.png) · [SVG](docs/diagrams/runbook03-noniis-model.svg)
 
 The ready-to-use scripts live in **[scripts/](scripts/)**:
 

@@ -1,0 +1,22 @@
+flowchart LR
+    subgraph L1["Layer 1 — Expiry (catch the outage)"]
+        A1["Check served cert on the wire<br/>Check-CertExpiry.ps1"] --> A2{Days to expiry}
+        A2 -->|30| I[Info]
+        A2 -->|15| W[Warn]
+        A2 -->|7| Cr[Critical / page]
+    end
+    subgraph L2["Layer 2 — Renewal success (catch the cause)"]
+        B1[win-acme email / task result]
+        B2[Acmebot App Insights alert]
+        B3[Automation failed-job alert]
+        B4[Certificate Transparency watch]
+    end
+    L1 -. catches the outage .-> Ops((Ops team))
+    L2 -. catches the cause .-> Ops
+
+    classDef l1 fill:#dbeafe,stroke:#1e40af,color:#000000;
+    classDef l2 fill:#ede9fe,stroke:#6d28d9,color:#000000;
+    classDef crit fill:#f8d7da,stroke:#b02a37,color:#000000;
+    class A1,A2,I,W l1;
+    class B1,B2,B3,B4 l2;
+    class Cr crit;

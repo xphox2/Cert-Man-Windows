@@ -1,0 +1,12 @@
+flowchart LR
+    Client["ACME client<br/>win-acme / Posh-ACME"] -->|"writes TXT via API"| DelZone[("Delegated API zone<br/>app.acme.example.com<br/>Cloudflare / Azure / acme-dns")]
+    CA["Let's Encrypt CA"] -->|"1. query _acme-challenge.app.example.com"| RealDNS[("Real host zone<br/>example.com<br/>internal / AD DNS")]
+    RealDNS -->|"2. static CNAME redirects to"| DelZone
+    DelZone -->|"3. returns TXT challenge value"| CA
+
+    classDef cloud fill:#dbeafe,stroke:#1e40af,color:#000000;
+    classDef int fill:#e2e8f0,stroke:#475569,color:#000000;
+    classDef ext fill:#fde68a,stroke:#b45309,color:#000000;
+    class DelZone cloud;
+    class RealDNS int;
+    class CA ext;

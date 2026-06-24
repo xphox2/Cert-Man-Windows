@@ -25,33 +25,36 @@
 
 ## Decision flow
 
+```mermaid
+flowchart TD
+    A([Wildcard, internal host, or port 80 blocked]) --> B{Where is the<br/>DNS hosted?}
+    B -->|Azure DNS| C1[Service principal scoped to zone<br/>DNS Zone Contributor]
+    B -->|Cloudflare| C2[Scoped API token<br/>Zone:DNS:Edit + Zone:Read]
+    B -->|GoDaddy / other| C3[API key + secret]
+    B -->|"On-prem / no API"| C4[CNAME delegation to<br/>Cloudflare / Azure / acme-dns]
+
+    C1 --> D[Issue against STAGING]
+    C2 --> D
+    C3 --> D
+    C4 --> D
+    D --> E{Success?}
+    E -->|No| F[Fix zone / creds / propagation<br/>see Runbook 07]
+    F --> D
+    E -->|Yes| G[Switch to PRODUCTION<br/>and re-issue]
+    G --> H[Verify, bind in IIS, add to monitoring]
+    H --> I([Done: auto-renew via DNS-01])
+
+    classDef act fill:#1f6feb,stroke:#0b3d91,color:#ffffff;
+    classDef dec fill:#fff3cd,stroke:#d39e00,color:#000000;
+    classDef ok fill:#1a7f37,stroke:#0b3d20,color:#ffffff,font-weight:bold;
+    classDef warn fill:#f8d7da,stroke:#b02a37,color:#000000;
+    class C1,C2,C3,C4,D,G,H act;
+    class B,E dec;
+    class F warn;
+    class I ok;
 ```
- Need wildcard, or internal host, or :80 blocked
-                  │
-                  ▼
-        Where is the DNS hosted?
-   ┌───────────┬───────────┬──────────────────┐
-   ▼           ▼           ▼                  ▼
- Azure DNS  Cloudflare   GoDaddy/        On-prem / internal
-   │           │         other            (no public API)
-   │           │           │                  │
-   │           │           │                  ▼
-   │           │           │       Set up CNAME delegation (§A)
-   │           │           │       to Cloudflare/Azure/acme-dns
-   └─────┬─────┴─────┬─────┘                  │
-         ▼           ▼                        ▼
-   Create scoped API credential        Point plugin at the
-   (§1 / §2 / §3)                       delegated zone
-         │
-         ▼
-   Issue against STAGING ─► success? ─No─► Runbook 07 (DNS propagation/creds)
-         │Yes
-         ▼
-   Switch to PRODUCTION, re-issue
-         │
-         ▼
-   Verify + add to monitoring (Runbook 06) ─► DONE
-```
+
+> 📊 **Slide-ready image:** [PNG](docs/diagrams/runbook02-dns01.png) · [SVG](docs/diagrams/runbook02-dns01.svg)
 
 ---
 
@@ -69,6 +72,23 @@ If the host lives on internal AD DNS (or any DNS without an automatable API), **
    _acme-challenge.example.com.       CNAME   example.acme.example.com.
    ```
 3. Configure the win-acme DNS plugin for the **delegated** provider/zone (`acme.example.com`). win-acme writes the TXT in the delegated zone; the CA follows the CNAME.
+
+```mermaid
+flowchart LR
+    Client["ACME client<br/>win-acme / Posh-ACME"] -->|"writes TXT via API"| DelZone[("Delegated API zone<br/>app.acme.example.com<br/>Cloudflare / Azure / acme-dns")]
+    CA["Let's Encrypt CA"] -->|"1. query _acme-challenge.app.example.com"| RealDNS[("Real host zone<br/>example.com<br/>internal / AD DNS")]
+    RealDNS -->|"2. static CNAME redirects to"| DelZone
+    DelZone -->|"3. returns TXT challenge value"| CA
+
+    classDef cloud fill:#dbeafe,stroke:#1e40af,color:#000000;
+    classDef int fill:#e2e8f0,stroke:#475569,color:#000000;
+    classDef ext fill:#fde68a,stroke:#b45309,color:#000000;
+    class DelZone cloud;
+    class RealDNS int;
+    class CA ext;
+```
+
+> 📊 **Slide-ready image:** [PNG](docs/diagrams/cname-delegation.png) · [SVG](docs/diagrams/cname-delegation.svg)
 
 The rest of this runbook then proceeds exactly as for a normal API-hosted zone.
 

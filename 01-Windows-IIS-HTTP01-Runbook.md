@@ -24,24 +24,30 @@
 
 ## Decision flow
 
+```mermaid
+flowchart TD
+    A([IIS site, public, port 80 open, no wildcard]) --> B[Install win-acme<br/>scripts/Install-WinAcme.ps1]
+    B --> C[Issue against STAGING]
+    C --> D{Success?}
+    D -->|No| E[Troubleshoot:<br/>port 80 / DNS / HSTS<br/>see Runbook 07]
+    E --> C
+    D -->|Yes| F[Switch to PRODUCTION<br/>and re-issue]
+    F --> G[win-acme auto-creates<br/>renew scheduled task SYSTEM]
+    G --> H[Verify IIS binding + task]
+    H --> I[Add host to monitoring<br/>Runbook 06]
+    I --> J([Done: auto-renew + auto-rebind])
+
+    classDef act fill:#1f6feb,stroke:#0b3d91,color:#ffffff;
+    classDef dec fill:#fff3cd,stroke:#d39e00,color:#000000;
+    classDef ok fill:#1a7f37,stroke:#0b3d20,color:#ffffff,font-weight:bold;
+    classDef warn fill:#f8d7da,stroke:#b02a37,color:#000000;
+    class B,C,F,G,H,I act;
+    class D dec;
+    class E warn;
+    class J ok;
 ```
- IIS site, public, port 80 open, no wildcard
-                  │
-                  ▼
-   Install win-acme  (scripts\Install-WinAcme.ps1)
-                  │
-                  ▼
-   Issue against STAGING  ──►  success?  ──No──►  Troubleshoot (port 80 / DNS / HSTS) → Runbook 07
-                  │Yes
-                  ▼
-   Switch to PRODUCTION, re-issue
-                  │
-                  ▼
-   win-acme auto-creates "win-acme renew" scheduled task
-                  │
-                  ▼
-   Verify binding + task  ──►  Add to monitoring (Runbook 06)  ──►  DONE
-```
+
+> 📊 **Slide-ready image:** [PNG](docs/diagrams/runbook01-iis-http01.png) · [SVG](docs/diagrams/runbook01-iis-http01.svg)
 
 ---
 

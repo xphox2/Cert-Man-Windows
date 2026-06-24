@@ -6,15 +6,32 @@
 
 ## Dual-layer model
 
+```mermaid
+flowchart LR
+    subgraph L1["Layer 1 — Expiry (catch the outage)"]
+        A1["Check served cert on the wire<br/>Check-CertExpiry.ps1"] --> A2{Days to expiry}
+        A2 -->|30| I[Info]
+        A2 -->|15| W[Warn]
+        A2 -->|7| Cr[Critical / page]
+    end
+    subgraph L2["Layer 2 — Renewal success (catch the cause)"]
+        B1[win-acme email / task result]
+        B2[Acmebot App Insights alert]
+        B3[Automation failed-job alert]
+        B4[Certificate Transparency watch]
+    end
+    L1 -. catches the outage .-> Ops((Ops team))
+    L2 -. catches the cause .-> Ops
+
+    classDef l1 fill:#dbeafe,stroke:#1e40af,color:#000000;
+    classDef l2 fill:#ede9fe,stroke:#6d28d9,color:#000000;
+    classDef crit fill:#f8d7da,stroke:#b02a37,color:#000000;
+    class A1,A2,I,W l1;
+    class B1,B2,B3,B4 l2;
+    class Cr crit;
 ```
- Layer 1 — EXPIRY (catch the outage)             Layer 2 — RENEWAL SUCCESS (catch the cause)
- ───────────────────────────────────             ──────────────────────────────────────────
- Check the cert ACTUALLY SERVED on the wire,     Confirm a renewal actually happened:
- independent of any renewal tool.                 - win-acme email on failure + task result
- Alert at 30 / 15 / 7 days to expiry.             - Acmebot App Insights failure alert
- Tool: Check-CertExpiry.ps1 (this folder).        - Azure Automation failed-job alert
-                                                   - Certificate Transparency log watch
-```
+
+> 📊 **Slide-ready image:** [PNG](docs/diagrams/monitoring-dual-layer.png) · [SVG](docs/diagrams/monitoring-dual-layer.svg)
 
 You need **both**. Layer 1 tells you an outage is coming; Layer 2 tells you *why* the renewal didn't run so you can fix it before Layer 1 fires.
 

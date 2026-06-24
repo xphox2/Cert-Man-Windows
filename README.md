@@ -18,41 +18,34 @@ See **[00-Background-and-Concepts.md](00-Background-and-Concepts.md)** for the "
 
 ## Master decision flow — "Which runbook do I use?"
 
+```mermaid
+flowchart TD
+    Start([Certificate needed]) --> Q1{What needs<br/>the certificate?}
+
+    Q1 -->|Windows Server| W{IIS website<br/>or other service?}
+    Q1 -->|Azure Web App| A{Managed<br/>or scripted?}
+
+    W -->|IIS website| WP{Port 80 reachable<br/>from internet?<br/>Wildcard needed?}
+    W -->|"RDP / SQL / Exchange<br/>/ custom HTTP.SYS"| R03["Runbook 03<br/>Non-IIS services<br/>DNS-01 + deploy script"]
+
+    WP -->|"Public :80, no wildcard"| R01["Runbook 01<br/>IIS HTTP-01"]
+    WP -->|"Internal / :80 blocked<br/>/ wildcard"| R02["Runbook 02<br/>IIS DNS-01 + wildcard"]
+
+    A -->|"Managed, low maintenance"| AB{Single app<br/>or multi-service?}
+    A -->|"Scripted, no Functions app"| R05["Runbook 05<br/>Posh-ACME + Automation"]
+
+    AB -->|Single Web App| R04a["Runbook 04<br/>App Service Acmebot"]
+    AB -->|"App Service + Front Door<br/>+ App Gateway"| R04b["Runbook 04<br/>Key Vault Acmebot"]
+
+    classDef rb fill:#1f6feb,stroke:#0b3d91,color:#ffffff,font-weight:bold;
+    classDef dec fill:#fff3cd,stroke:#d39e00,color:#000000;
+    classDef ep fill:#e2e8f0,stroke:#475569,color:#000000;
+    class R01,R02,R03,R04a,R04b,R05 rb;
+    class Q1,W,WP,A,AB dec;
+    class Start ep;
 ```
-                          ┌─────────────────────────────────────────┐
-                          │  What needs the certificate?            │
-                          └─────────────────────────────────────────┘
-                                   │                       │
-                  ┌────────────────┘                       └────────────────┐
-                  ▼                                                          ▼
-        ┌───────────────────┐                                   ┌────────────────────────┐
-        │  Windows Server   │                                   │  Azure Web App /       │
-        │  (IIS / service)  │                                   │  App Service           │
-        └───────────────────┘                                   └────────────────────────┘
-                  │                                                          │
-       ┌──────────┴───────────┐                              ┌──────────────┴───────────────┐
-       ▼                      ▼                              ▼                               ▼
-┌──────────────┐   ┌────────────────────┐         ┌────────────────────┐        ┌────────────────────────┐
-│ IIS website  │   │ Non-IIS service:   │         │ Want a managed,    │        │ Want a scripted /      │
-│              │   │ RDP / SQL / Exch / │         │ low-maintenance    │        │ runbook-based path     │
-│              │   │ custom HTTP.SYS    │         │ deployment         │        │ (no Functions app)     │
-└──────────────┘   └────────────────────┘         └────────────────────┘        └────────────────────────┘
-       │                      │                              │                               │
-       ▼                      ▼                              ▼                               ▼
-  Is port 80           Use win-acme               Single app? → App Service          Use Posh-ACME +
-  reachable from       --installation script      Acmebot.                           Azure Automation
-  the public           or Posh-ACME.Deploy        Multiple Azure services            runbook.
-  internet?            ▼                           (App Service + Front Door          ▼
-       │           RUNBOOK 03                      + App Gateway)? → Key Vault     RUNBOOK 05
-   ┌───┴────┐                                      Acmebot.
-   ▼        ▼                                          ▼
- YES       NO / wildcard                            RUNBOOK 04
-   │        │
-   ▼        ▼
-RUNBOOK   RUNBOOK
-  01        02
-(HTTP-01) (DNS-01)
-```
+
+> 📊 **Slide-ready image:** [PNG](docs/diagrams/master-decision-flow.png) · [SVG](docs/diagrams/master-decision-flow.svg) — see [docs/diagrams/](docs/diagrams/) for all flow diagrams.
 
 ### Quick lookup table
 
@@ -92,6 +85,7 @@ RUNBOOK   RUNBOOK
 | [06-Monitoring-and-Alerting.md](06-Monitoring-and-Alerting.md) | Dual-layer monitoring, alert thresholds, expiry checks. |
 | [07-Operations-and-Troubleshooting.md](07-Operations-and-Troubleshooting.md) | Incident runbook, failure modes, gotchas, rate-limit recovery, staging→prod cutover. |
 | [scripts/](scripts/) | Ready-to-run PowerShell: install, deploy-to-service, monitoring, Posh-ACME renewal. |
+| [docs/diagrams/](docs/diagrams/) | All flow diagrams (Mermaid source + SVG/PNG exports) for training and slides. |
 | [CHANGELOG.md](CHANGELOG.md) | Handbook version history. |
 
 ---

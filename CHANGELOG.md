@@ -2,6 +2,16 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.1] — 2026-06-24
+
+### Changed
+- Replaced all ASCII-art flow diagrams with **Mermaid** diagrams across the README and runbooks 01–06. GitHub renders these inline as clean visual diagrams for training.
+
+### Added
+- `docs/diagrams/` — editable Mermaid source (`src/*.mmd`), plus **SVG and high-resolution PNG** exports of every flow for slides/printed handouts, a diagrams index (`README.md`), the render config (`mmdc-config.json`), and `render-diagrams.ps1` to regenerate images after edits.
+- Each runbook now links its slide-ready PNG/SVG beneath the inline diagram.
+- New CNAME-delegation diagram in Runbook 02 §A.
+
 ## [0.1.0] — 2026-06-24
 
 Initial release of the SSL Certificate Rotation Automation operations handbook.
