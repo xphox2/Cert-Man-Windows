@@ -4,14 +4,14 @@
 
   Run it (elevated not required up front - it will self-elevate):
 
-      irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex
+      irm https://xphox2.github.io/Cert-Man-Windows/preflight.ps1 | iex
 
   It checks the environment, offers to fix what's missing (IIS role, win-acme, etc.),
   loops until everything is green, then optionally runs a real DNS-01 validation test
   against Let's Encrypt staging. ASCII-only, no BOM (so it pipes cleanly to iex).
 #>
 
-$Url         = 'https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1'
+$Url         = 'https://xphox2.github.io/Cert-Man-Windows/preflight.ps1'
 $WinAcmePath = 'C:\win-acme'
 $StagingUri  = 'https://acme-staging-v02.api.letsencrypt.org/directory'
 

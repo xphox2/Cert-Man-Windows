@@ -11,8 +11,10 @@
 On a new Windows/IIS box, open **PowerShell** and run:
 
 ```powershell
-irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex
+irm https://xphox2.github.io/Cert-Man-Windows/preflight.ps1 | iex
 ```
+
+<sub>Served via GitHub Pages. Fallback if Pages is unavailable: `irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex`</sub>
 
 It self-elevates (in a clean window), checks **ACME + DNS** with simple pass/fail output, **offers to auto-fix** what's missing (installs the win-acme pluggable build), loops until green, then optionally runs a **real DNS-01 validation test** against Let's Encrypt staging to prove wildcard issuance works. When it says **READY**, jump to your runbook below.
 

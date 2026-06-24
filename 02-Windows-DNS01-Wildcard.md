@@ -19,7 +19,7 @@
 
 > **Run the preflight first** (especially on a fresh box). The interactive one-liner installs IIS + win-acme and walks you through a **real DNS-01 validation test** against Let's Encrypt staging — proving your DNS API credentials and propagation work *before* you touch production:
 > ```powershell
-> irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex
+> irm https://xphox2.github.io/Cert-Man-Windows/preflight.ps1 | iex
 > ```
 > When prompted, choose to run the DNS-01 test and pick your provider (Cloudflare / Azure DNS / GoDaddy). For a scripted/non-interactive version with parameters, see [scripts/Preflight-Check.ps1](scripts/Preflight-Check.ps1).
 

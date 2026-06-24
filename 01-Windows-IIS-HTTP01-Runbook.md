@@ -62,7 +62,7 @@ Two small, focused scripts:
 & "E:\NOC\SSL_Rotation_Windows\scripts\Setup-IIS.ps1" -SiteName MySite -HostNames www.example.com
 
 # 2) Validate ACME + DNS and install win-acme (interactive one-liner):
-irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex
+irm https://xphox2.github.io/Cert-Man-Windows/preflight.ps1 | iex
 ```
 
 The **preflight** is scoped to ACME + DNS only (internet to Let's Encrypt, win-acme pluggable build, optional DNS-01 test). The **IIS** concern is its own script, `Setup-IIS.ps1`. When the preflight prints **READY** and win-acme is installed, you can **skip Step 1**.

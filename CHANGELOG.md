@@ -2,6 +2,15 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.9] — 2026-06-24
+
+### Added
+- **GitHub Pages** publishing for a clean, stable one-liner URL:
+  ```
+  irm https://xphox2.github.io/Cert-Man-Windows/preflight.ps1 | iex
+  ```
+  Added `.nojekyll` so Pages serves the raw `.ps1` as-is (no Jekyll build). `preflight.ps1`'s self-relaunch URL, the README Quick start, and Runbooks 01/02 now use the Pages URL; the raw.githubusercontent URL remains as a documented fallback.
+
 ## [0.1.8] — 2026-06-24
 
 ### Fixed
