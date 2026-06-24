@@ -41,7 +41,9 @@ param(
     [string]$SmtpPassword,
     [switch]$Staging,
     [switch]$Production,
-    [int]$RenewalDays = 55
+    [int]$RenewalDays = 55,
+    [ValidateSet('cloudflare', 'azure', 'godaddy', 'route53', 'digitalocean')]
+    [string[]]$DnsPlugin
 )
 
 $ErrorActionPreference = 'Stop'
@@ -67,12 +69,14 @@ $baseUri = if ($useStaging) {
 Write-Host "==> Installing win-acme to $InstallPath (endpoint: $baseUri)" -ForegroundColor Cyan
 New-Item -ItemType Directory -Path $InstallPath -Force | Out-Null
 
-# --- Download latest x64 trimmed release -----------------------------------
+# --- Download latest x64 PLUGGABLE release ---------------------------------
+# Use the pluggable build (NOT trimmed): the trimmed build cannot load the external
+# DNS validation plugins (Cloudflare/Azure/GoDaddy) that wildcard/DNS-01 issuance needs.
 Write-Host '==> Resolving latest release from GitHub...'
 $release = Invoke-RestMethod -Uri 'https://api.github.com/repos/win-acme/win-acme/releases/latest' `
     -Headers @{ 'User-Agent' = 'winacme-bootstrap' }
-$asset = $release.assets | Where-Object name -like '*x64.trimmed.zip' | Select-Object -First 1
-if (-not $asset) { throw 'Could not find an x64.trimmed.zip asset on the latest release.' }
+$asset = $release.assets | Where-Object name -like '*x64.pluggable.zip' | Select-Object -First 1
+if (-not $asset) { throw 'Could not find an x64.pluggable.zip asset on the latest release.' }
 
 $zip = Join-Path $env:TEMP $asset.name
 Write-Host "==> Downloading $($asset.name) ($([math]::Round($asset.size/1MB,1)) MB)..."
@@ -81,6 +85,18 @@ Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip
 Write-Host '==> Extracting...'
 Expand-Archive -Path $zip -DestinationPath $InstallPath -Force
 Remove-Item $zip -Force
+
+# --- Optional: install DNS validation plugin(s) (separate downloads) -------
+foreach ($p in $DnsPlugin) {
+    $match = "plugin.validation.dns.$p"
+    $pa = $release.assets | Where-Object { $_.name -like "$match.*.zip" } | Select-Object -First 1
+    if (-not $pa) { Write-Warning "DNS plugin '$p' not found in latest release; skipping."; continue }
+    Write-Host "==> Installing DNS plugin: $($pa.name)..."
+    $pz = Join-Path $env:TEMP $pa.name
+    Invoke-WebRequest -Uri $pa.browser_download_url -OutFile $pz
+    Expand-Archive -Path $pz -DestinationPath $InstallPath -Force
+    Remove-Item $pz -Force
+}
 
 Write-Host '==> Unblocking DLLs/EXE...'
 Get-ChildItem -Path $InstallPath -Include *.dll, *.exe -Recurse | Unblock-File

@@ -2,6 +2,15 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.6] — 2026-06-24
+
+### Fixed
+- **DNS-01 validation test failed with no logs.** Root cause: the installer fetched win-acme's **trimmed** build, which cannot load external DNS provider plugins, so `--validation cloudflare/azure/godaddy` failed instantly; the script also swallowed win-acme's output and pointed at the wrong log path.
+  - `preflight.ps1` and `scripts/Install-WinAcme.ps1` now install the **pluggable** build.
+  - `preflight.ps1` downloads the matching DNS provider plugin on demand before the test, **shows win-acme's output** (last 25 lines) on failure, and saves the full log to `C:\win-acme\preflight-dns-test.log`.
+  - The win-acme readiness check now detects a **trimmed** install and offers to upgrade it to pluggable (so an existing trimmed install is auto-fixed on re-run).
+- `scripts/Install-WinAcme.ps1` gains a `-DnsPlugin` parameter (cloudflare/azure/godaddy/route53/digitalocean) to fetch provider plugins during install. Runbook 02 plugin note updated.
+
 ## [0.1.5] — 2026-06-24
 
 ### Added

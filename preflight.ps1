@@ -62,16 +62,29 @@ if (-not (Test-AdminNow)) {
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 # --------------------------------------------------------------- fixers ----
+function Get-WinAcmeRelease {
+    Invoke-RestMethod 'https://api.github.com/repos/win-acme/win-acme/releases/latest' -Headers @{ 'User-Agent' = 'cert-man-preflight' }
+}
 function Install-WinAcmeInline {
     New-Item -ItemType Directory -Path $WinAcmePath -Force | Out-Null
-    $rel = Invoke-RestMethod 'https://api.github.com/repos/win-acme/win-acme/releases/latest' -Headers @{ 'User-Agent' = 'cert-man-preflight' }
-    $asset = $rel.assets | Where-Object name -like '*x64.trimmed.zip' | Select-Object -First 1
-    if (-not $asset) { throw 'Could not find win-acme release asset.' }
+    # Use the PLUGGABLE build (the trimmed build cannot load external DNS plugins).
+    $asset = (Get-WinAcmeRelease).assets | Where-Object name -like '*x64.pluggable.zip' | Select-Object -First 1
+    if (-not $asset) { throw 'Could not find win-acme pluggable release asset.' }
     $zip = Join-Path $env:TEMP 'winacme.zip'
     Invoke-WebRequest $asset.browser_download_url -OutFile $zip -UseBasicParsing
     Expand-Archive $zip $WinAcmePath -Force
     Remove-Item $zip -Force
     Get-ChildItem $WinAcmePath -Include *.dll, *.exe -Recurse | Unblock-File
+}
+function Install-WinAcmePlugin {
+    param([string]$Match)   # e.g. 'plugin.validation.dns.cloudflare'
+    $asset = (Get-WinAcmeRelease).assets | Where-Object { $_.name -like "$Match.*.zip" } | Select-Object -First 1
+    if (-not $asset) { throw "win-acme plugin '$Match' not found in latest release." }
+    $zip = Join-Path $env:TEMP ($Match + '.zip')
+    Invoke-WebRequest $asset.browser_download_url -OutFile $zip -UseBasicParsing
+    Expand-Archive $zip $WinAcmePath -Force
+    Remove-Item $zip -Force
+    Get-ChildItem $WinAcmePath -Include *.dll -Recurse | Unblock-File
 }
 
 # --------------------------------------------------------------- checks ----
@@ -96,9 +109,13 @@ function Get-Checks {
         Fix    = { Install-WindowsFeature Web-Scripting-Tools -ErrorAction SilentlyContinue | Out-Null } }
 
     $hasW = Test-Path (Join-Path $WinAcmePath 'wacs.exe')
-    $checks += [pscustomobject]@{ Name = 'win-acme ACME client'; Ok = $hasW
-        Detail = $(if ($hasW) { $WinAcmePath } else { 'not installed' }); CanFix = $true
-        Fix    = { Install-WinAcmeInline } }
+    # The pluggable build extracts many DLLs; the trimmed build has almost none and CANNOT load
+    # DNS provider plugins. Treat a trimmed install as "needs fix" so DNS-01 issuance works.
+    $dllCount = if ($hasW) { @(Get-ChildItem $WinAcmePath -Filter *.dll -ErrorAction SilentlyContinue).Count } else { 0 }
+    $pluggable = $dllCount -gt 10
+    $checks += [pscustomobject]@{ Name = 'win-acme (pluggable, DNS-capable)'; Ok = ($hasW -and $pluggable)
+        Detail = $(if (-not $hasW) { 'not installed' } elseif (-not $pluggable) { 'trimmed build found - needs pluggable for DNS plugins' } else { "pluggable build at $WinAcmePath" })
+        CanFix = $true; Fix = { Install-WinAcmeInline } }
 
     $checks
 }
@@ -128,21 +145,45 @@ function Invoke-DnsTest {
     }
     if (-not $val) { Write-Host '   Skipped.' -ForegroundColor Yellow; return }
 
+    # The DNS provider plugin is a SEPARATE download from the base win-acme build - install it on demand.
+    $pluginMatch = switch ($choice) {
+        '1' { 'plugin.validation.dns.cloudflare' }
+        '2' { 'plugin.validation.dns.azure' }
+        '3' { 'plugin.validation.dns.godaddy' }
+    }
+    Write-Host ''
+    Status 'FIX' "$pluginMatch" 'installing DNS provider plugin...'
+    try { Install-WinAcmePlugin $pluginMatch; Status 'OK' 'DNS provider plugin' 'installed' }
+    catch { Status 'FAIL' 'DNS provider plugin' $_.Exception.Message; return }
+
     $tmp = Join-Path $env:TEMP ('pf-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
     $fn = "PREFLIGHT $testHost"; $pw = [guid]::NewGuid().ToString('N')
+    $log = Join-Path $WinAcmePath 'preflight-dns-test.log'
     Write-Host ''
     Write-Host '   Running a staging issuance (writes + removes a TXT record)...' -ForegroundColor Cyan
     $a = @('--baseuri', $StagingUri, '--source', 'manual', '--host', $testHost) + $val +
          @('--store', 'pfxfile', '--pfxfilepath', $tmp, '--pfxpassword', $pw, '--installation', 'none',
-           '--emailaddress', $email, '--accepttos', '--friendlyname', $fn, '--closeonfinish')
-    try { & $wacs @a 2>&1 | Out-Null } catch {}
+           '--emailaddress', $email, '--accepttos', '--friendlyname', $fn, '--closeonfinish', '--verbose')
+    $out = $null
+    try { $out = & $wacs @a 2>&1 } catch { $out = $_.Exception.Message }
+    $out | Out-File -FilePath $log -Encoding utf8
     $ok = ($LASTEXITCODE -eq 0) -and (Get-ChildItem $tmp -Filter *.pfx -ErrorAction SilentlyContinue)
     try { & $wacs --baseuri $StagingUri --cancel --friendlyname $fn --closeonfinish 2>&1 | Out-Null } catch {}
     Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+
     Write-Host ''
-    if ($ok) { Status 'OK' 'DNS-01 validation' "staging cert issued for $testHost - your DNS automation works!" }
-    else { Status 'FAIL' 'DNS-01 validation' "failed - check credentials/zone scope and $WinAcmePath logs" }
+    if ($ok) {
+        Status 'OK' 'DNS-01 validation' "staging cert issued for $testHost - your DNS automation works!"
+    } else {
+        Status 'FAIL' 'DNS-01 validation' 'staging issuance did not complete'
+        Write-Host '   --- win-acme output (last 25 lines) ------------------------' -ForegroundColor DarkYellow
+        @($out) | Select-Object -Last 25 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkGray }
+        Write-Host '   ------------------------------------------------------------' -ForegroundColor DarkYellow
+        Write-Host "   Full output saved to: $log" -ForegroundColor Yellow
+        Write-Host '   Common causes: wrong API token, token lacks DNS-edit on this zone,' -ForegroundColor Yellow
+        Write-Host '   or the zone is hosted by a different provider than selected.' -ForegroundColor Yellow
+    }
 }
 
 # ----------------------------------------------------------- main loop -----
