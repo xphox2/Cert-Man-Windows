@@ -88,7 +88,7 @@ flowchart TD
 | [06-Monitoring-and-Alerting.md](06-Monitoring-and-Alerting.md) | Dual-layer monitoring, alert thresholds, expiry checks. |
 | [07-Operations-and-Troubleshooting.md](07-Operations-and-Troubleshooting.md) | Incident runbook, failure modes, gotchas, rate-limit recovery, staging→prod cutover. |
 | [08-Replacing-Existing-Certs.md](08-Replacing-Existing-Certs.md) | **Vendor-agnostic migration** — take over a self-signed/default, GoDaddy, DigiCert, or any cert with Let's Encrypt. Cross-cutting companion to 01/02/03. |
-| [scripts/](scripts/) | Ready-to-run PowerShell: install, deploy-to-service, monitoring, Posh-ACME renewal, cert inventory + safe removal (migration). |
+| [scripts/](scripts/) | Ready-to-run PowerShell: **preflight readiness check**, install, deploy-to-service, monitoring, Posh-ACME renewal, cert inventory + safe removal (migration). |
 | [docs/diagrams/](docs/diagrams/) | All flow diagrams (Mermaid source + SVG/PNG exports) for training and slides. |
 | [docs/training-deck/](docs/training-deck/) | Print-ready [training deck PDF](docs/training-deck/SSL-Cert-Rotation-Training-Deck.pdf) — every diagram in order, one per slide. |
 | [CHANGELOG.md](CHANGELOG.md) | Handbook version history. |

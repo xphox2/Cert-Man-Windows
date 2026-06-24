@@ -2,6 +2,14 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.4] — 2026-06-24
+
+### Added
+- **`scripts/Preflight-Check.ps1`** — a fresh-server readiness gate and setup helper. Verifies elevation/OS/PowerShell, the IIS role + WebAdministration module (installs with `-InstallIIS`), current IIS sites/bindings baseline, TLS 1.2, outbound reachability to Let's Encrypt (staging + prod) and the DNS provider API, win-acme presence (installs via `Install-WinAcme.ps1` with `-InstallWinAcme`), and per-domain DNS resolution. Includes an optional **DNS-01 validation test** that issues and then cancels a throwaway cert from Let's Encrypt **staging** (Cloudflare/Azure/GoDaddy) to prove DNS credentials, propagation, and CA reachability end-to-end. Prints READY / NOT READY and sets exit code accordingly. Verified running on Windows Server 2022 / PowerShell 5.1.
+
+### Changed
+- Runbook 01 gains a **Step 0 — Preflight**; Runbook 02 prerequisites lead with the preflight (including the DNS-01 staging test). README scripts entry updated.
+
 ## [0.1.3] — 2026-06-24
 
 ### Added

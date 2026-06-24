@@ -17,7 +17,15 @@
 
 ## Prerequisites
 
-- [ ] win-acme installed (`scripts\Install-WinAcme.ps1` — see [01 Step 1](01-Windows-IIS-HTTP01-Runbook.md#step-1--install-win-acme)).
+> **Run the preflight first** (especially on a fresh box). It installs IIS + win-acme and, crucially, includes a **real DNS-01 validation test** against Let's Encrypt staging — proving your DNS API credentials and propagation work *before* you touch production:
+> ```powershell
+> & "E:\NOC\SSL_Rotation_Windows\scripts\Preflight-Check.ps1" -Domains example.com -InstallIIS -InstallWinAcme `
+>     -NotifyEmail ops@example.com `
+>     -RunDnsValidationTest -DnsProvider Cloudflare -CloudflareToken "<scoped-token>" -TestHost "*.example.com"
+> ```
+> See [scripts/Preflight-Check.ps1](scripts/Preflight-Check.ps1) for the Azure/GoDaddy parameter sets.
+
+- [ ] win-acme installed (`scripts\Install-WinAcme.ps1` — see [01 Step 1](01-Windows-IIS-HTTP01-Runbook.md#step-1--install-win-acme), or installed by the preflight above).
 - [ ] DNS for the domain is hosted somewhere with an **API** — Azure DNS, Cloudflare, or GoDaddy — **or** you'll use **CNAME delegation** for on-prem DNS (see §A).
 - [ ] API credentials created with **least privilege** (one zone, DNS-edit only). Provider-specific steps below.
 - [ ] For wildcard binding to IIS: the IIS site must have an HTTPS binding for a concrete host under the wildcard (you bind a real host, e.g. `app.example.com`, using the wildcard cert).
