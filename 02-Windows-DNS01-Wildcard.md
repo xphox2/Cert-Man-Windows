@@ -12,6 +12,11 @@
 > Wildcards can **only** be issued via DNS-01 — there is no HTTP-01 path for them.
 >
 > **Replacing existing wildcard certs** (e.g. three wildcard domains currently on GoDaddy/DigiCert, or a self-signed default)? Issue here exactly as below — win-acme re-binds each site to the new Let's Encrypt wildcard. Pair with **[08](08-Replacing-Existing-Certs.md)** for inventory, cutover, and cleanup of the old vendor certs.
+>
+> **Not sure which wildcards you need?** Run the planner — it scans your IIS bindings and groups host names into the minimum set of wildcard certs (host names sharing a parent domain collapse onto one cert), shows what's already covered, and prints the exact `wacs.exe` commands:
+> ```powershell
+> irm https://xphox2.github.io/Cert-Man-Windows/plan-certs.ps1 | iex
+> ```
 
 ---
 

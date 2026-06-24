@@ -2,6 +2,12 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.10] — 2026-06-24
+
+### Added
+- **`plan-certs.ps1`** — interactive (preflight-style) **wildcard certificate planner**. Scans every IIS site/binding, groups host names into the **minimum set of wildcard certs** by parent domain (so names sharing a parent collapse onto one cert; the apex is added as a SAN; multi-level names get their own `*.sub` cert), resolves the correct DNS zone via the Public Suffix List (handles `co.uk` etc.), checks the cert store for existing coverage (OK / renew-soon / missing), and prints the exact `wacs.exe` commands to generate what's missing. Self-elevates and runs via `irm https://xphox2.github.io/Cert-Man-Windows/plan-certs.ps1 | iex`.
+- README Quick start and Runbook 02 now reference the planner. Verified the grouping/PSL logic against shared-parent, apex, multi-level, and `co.uk` host sets.
+
 ## [0.1.9] — 2026-06-24
 
 ### Added
