@@ -2,6 +2,18 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.5] — 2026-06-24
+
+### Added
+- **`preflight.ps1`** (repo root) — a self-contained, interactive, MassGrave-style one-liner:
+  ```
+  irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex
+  ```
+  Self-elevates, runs clean pass/fail checks, **prompts to auto-fix** missing pieces (installs the IIS role + win-acme inline), loops until green, then optionally runs an interactive DNS-01 validation test against Let's Encrypt staging. ASCII-only and BOM-free so it pipes cleanly to `iex`.
+
+### Changed
+- README gains a top-of-page **Quick start** with the one-liner; Runbook 01 Step 0 and Runbook 02 prerequisites now lead with it. The parameterized `scripts/Preflight-Check.ps1` remains for non-interactive/automation use.
+
 ## [0.1.4] — 2026-06-24
 
 ### Added

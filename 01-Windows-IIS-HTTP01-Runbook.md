@@ -55,17 +55,13 @@ flowchart TD
 
 ## Step 0 — Preflight (run this first on a fresh box)
 
-Before anything else, validate the server is ready — and let the preflight install the IIS role and win-acme for you:
+On a fresh box, just run the interactive one-liner. It self-elevates, checks everything, and offers to auto-install the IIS role and win-acme for you:
 
 ```powershell
-# Check-only (read-only):
-& "E:\NOC\SSL_Rotation_Windows\scripts\Preflight-Check.ps1" -Domains example.com
-
-# Set up a fresh box (installs IIS role + win-acme), then re-check:
-& "E:\NOC\SSL_Rotation_Windows\scripts\Preflight-Check.ps1" -Domains example.com -InstallIIS -InstallWinAcme -NotifyEmail ops@example.com
+irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex
 ```
 
-It verifies elevation/OS/PowerShell, the IIS role + module, TLS 1.2, outbound reachability to Let's Encrypt, win-acme, and DNS resolution, then prints **READY / NOT READY**. Resolve any `FAIL` before continuing. (If win-acme was installed by preflight, you can skip Step 1.)
+When it prints **READY**, the IIS role and win-acme are installed and you can **skip Step 1**. (Prefer a parameterized/non-interactive version for automation? Use `scripts\Preflight-Check.ps1` — see its `-Domains/-InstallIIS/-InstallWinAcme` switches.)
 
 ## Step 1 — Install win-acme
 

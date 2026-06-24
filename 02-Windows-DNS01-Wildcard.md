@@ -17,13 +17,11 @@
 
 ## Prerequisites
 
-> **Run the preflight first** (especially on a fresh box). It installs IIS + win-acme and, crucially, includes a **real DNS-01 validation test** against Let's Encrypt staging — proving your DNS API credentials and propagation work *before* you touch production:
+> **Run the preflight first** (especially on a fresh box). The interactive one-liner installs IIS + win-acme and walks you through a **real DNS-01 validation test** against Let's Encrypt staging — proving your DNS API credentials and propagation work *before* you touch production:
 > ```powershell
-> & "E:\NOC\SSL_Rotation_Windows\scripts\Preflight-Check.ps1" -Domains example.com -InstallIIS -InstallWinAcme `
->     -NotifyEmail ops@example.com `
->     -RunDnsValidationTest -DnsProvider Cloudflare -CloudflareToken "<scoped-token>" -TestHost "*.example.com"
+> irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex
 > ```
-> See [scripts/Preflight-Check.ps1](scripts/Preflight-Check.ps1) for the Azure/GoDaddy parameter sets.
+> When prompted, choose to run the DNS-01 test and pick your provider (Cloudflare / Azure DNS / GoDaddy). For a scripted/non-interactive version with parameters, see [scripts/Preflight-Check.ps1](scripts/Preflight-Check.ps1).
 
 - [ ] win-acme installed (`scripts\Install-WinAcme.ps1` — see [01 Step 1](01-Windows-IIS-HTTP01-Runbook.md#step-1--install-win-acme), or installed by the preflight above).
 - [ ] DNS for the domain is hosted somewhere with an **API** — Azure DNS, Cloudflare, or GoDaddy — **or** you'll use **CNAME delegation** for on-prem DNS (see §A).

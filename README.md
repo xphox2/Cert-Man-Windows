@@ -6,6 +6,20 @@
 
 ---
 
+## ⚡ Quick start — preflight a fresh server
+
+On a new Windows/IIS box, open **PowerShell** and run:
+
+```powershell
+irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex
+```
+
+It self-elevates, checks the environment with clean pass/fail output, **offers to auto-fix** what's missing (installs the IIS role and win-acme), loops until everything's green, then optionally runs a **real DNS-01 validation test** against Let's Encrypt staging to prove wildcard issuance works. When it says **READY**, jump to your runbook below.
+
+> Prefer a non-interactive/scriptable version (parameters, automation, CI)? Use [`scripts/Preflight-Check.ps1`](scripts/Preflight-Check.ps1).
+
+---
+
 ## Why this handbook exists
 
 Certificate lifetimes have collapsed. We used to renew once a year (365 days). Public CAs are now on a CA/Browser Forum–mandated schedule that drops the maximum TLS certificate lifetime to **~47 days by 2029**, and Let's Encrypt certificates are already **90 days** (moving to **45 days during 2026**, with 6‑day short‑lived certs generally available).
