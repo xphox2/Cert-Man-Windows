@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SSL Certificate Rotation Automation — Training Deck</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: "Segoe UI", Helvetica, Arial, sans-serif; color: #1e293b; }
+
+  .slide {
+    width: 297mm; height: 209.5mm;        /* A4 landscape, 0.5mm shy to avoid overflow pages */
+    page-break-after: always;
+    display: flex; flex-direction: column;
+    overflow: hidden; position: relative;
+    background: #ffffff;
+  }
+  .slide:last-child { page-break-after: auto; }
+
+  /* ---- Title slide ---- */
+  .title {
+    justify-content: center; align-items: center; text-align: center;
+    background: linear-gradient(135deg, #0b3d91 0%, #1f6feb 100%); color: #fff;
+  }
+  .title h1 { font-size: 42pt; font-weight: 700; line-height: 1.15; max-width: 80%; }
+  .title h2 { font-size: 18pt; font-weight: 400; margin-top: 18px; opacity: .92; }
+  .title .meta { margin-top: 40px; font-size: 12pt; opacity: .85; }
+  .title .ca { margin-top: 6px; font-size: 12pt; opacity: .85; }
+
+  /* ---- Diagram slides ---- */
+  .header {
+    display: flex; align-items: baseline; gap: 14px;
+    padding: 16mm 18mm 6mm 18mm;
+  }
+  .header .num {
+    font-size: 14pt; font-weight: 700; color: #fff; background: #1f6feb;
+    border-radius: 6px; padding: 4px 12px; white-space: nowrap;
+  }
+  .header .ttl { font-size: 24pt; font-weight: 700; color: #0b3d91; }
+  .caption { padding: 0 18mm; font-size: 13pt; color: #475569; }
+
+  .figure { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 4mm 14mm 16mm; }
+  .figure img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+
+  .footer {
+    position: absolute; bottom: 7mm; left: 18mm; right: 18mm;
+    display: flex; justify-content: space-between;
+    font-size: 9pt; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 5px;
+  }
+</style>
+</head>
+<body>
+
+  <!-- 0 — Title -->
+  <section class="slide title">
+    <h1>SSL Certificate Rotation Automation</h1>
+    <h2>Operations Training Deck &middot; Let's Encrypt on Windows Server &amp; Azure Web Apps</h2>
+    <div class="meta">NOC / Infrastructure Operations</div>
+    <div class="ca">Companion to the Cert-Man-Windows handbook</div>
+  </section>
+
+  <!-- 1 — Master decision flow -->
+  <section class="slide">
+    <div class="header"><span class="num">Start here</span><span class="ttl">Which runbook do I use?</span></div>
+    <div class="caption">Pick the right path for any certificate based on what needs it and how it's exposed.</div>
+    <div class="figure"><img src="../diagrams/master-decision-flow.svg" alt="Master decision flow"></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>1 / 8</span></div>
+  </section>
+
+  <!-- 2 — Runbook 01 -->
+  <section class="slide">
+    <div class="header"><span class="num">Runbook 01</span><span class="ttl">Windows IIS — HTTP-01</span></div>
+    <div class="caption">Public IIS website, port 80 reachable, no wildcard. win-acme issues, binds, and auto-renews.</div>
+    <div class="figure"><img src="../diagrams/runbook01-iis-http01.svg" alt="IIS HTTP-01 process"></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>2 / 8</span></div>
+  </section>
+
+  <!-- 3 — Runbook 02 -->
+  <section class="slide">
+    <div class="header"><span class="num">Runbook 02</span><span class="ttl">Windows DNS-01 &amp; Wildcard</span></div>
+    <div class="caption">Wildcard, internal host, or port 80 blocked. Validate via the DNS provider's API.</div>
+    <div class="figure"><img src="../diagrams/runbook02-dns01.svg" alt="DNS-01 / wildcard process"></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>3 / 8</span></div>
+  </section>
+
+  <!-- 4 — CNAME delegation -->
+  <section class="slide">
+    <div class="header"><span class="num">Runbook 02 &sect;A</span><span class="ttl">CNAME Delegation (on-prem DNS)</span></div>
+    <div class="caption">Internal/API-less DNS? Delegate only the _acme-challenge record to an API-capable zone.</div>
+    <div class="figure"><img src="../diagrams/cname-delegation.svg" alt="CNAME delegation"></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>4 / 8</span></div>
+  </section>
+
+  <!-- 5 — Runbook 03 -->
+  <section class="slide">
+    <div class="header"><span class="num">Runbook 03</span><span class="ttl">Non-IIS Services</span></div>
+    <div class="caption">RDP, SQL Server, Exchange, custom HTTP.SYS: renew, then a post-renewal script re-binds &amp; restarts.</div>
+    <div class="figure"><img src="../diagrams/runbook03-noniis-model.svg" alt="Non-IIS renewal-to-deploy model"></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>5 / 8</span></div>
+  </section>
+
+  <!-- 6 — Runbook 04 -->
+  <section class="slide">
+    <div class="header"><span class="num">Runbook 04</span><span class="ttl">Azure Web App — Acmebot (primary)</span></div>
+    <div class="caption">Managed, hands-off: cert lands in Key Vault, App Service auto-imports within 24h.</div>
+    <div class="figure"><img src="../diagrams/runbook04-acmebot-arch.svg" alt="Acmebot architecture"></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>6 / 8</span></div>
+  </section>
+
+  <!-- 7 — Runbook 05 -->
+  <section class="slide">
+    <div class="header"><span class="num">Runbook 05</span><span class="ttl">Azure Web App — Posh-ACME (alternative)</span></div>
+    <div class="caption">Scripted path: an Azure Automation runbook issues, uploads to Key Vault, and persists state.</div>
+    <div class="figure"><img src="../diagrams/runbook05-poshacme-arch.svg" alt="Posh-ACME + Automation architecture"></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>7 / 8</span></div>
+  </section>
+
+  <!-- 8 — Runbook 06 -->
+  <section class="slide">
+    <div class="header"><span class="num">Runbook 06</span><span class="ttl">Monitoring &amp; Alerting</span></div>
+    <div class="caption">Automation fails silently — dual-layer monitoring catches both the outage and its cause.</div>
+    <div class="figure"><img src="../diagrams/monitoring-dual-layer.svg" alt="Dual-layer monitoring"></div>
+    <div class="footer"><span>SSL Certificate Rotation Automation</span><span>8 / 8</span></div>
+  </section>
+
+</body>
+</html>

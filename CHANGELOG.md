@@ -2,6 +2,12 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.2] — 2026-06-24
+
+### Added
+- `docs/training-deck/` — a print-ready **training deck PDF** (`SSL-Cert-Rotation-Training-Deck.pdf`): A4-landscape title slide plus one slide per diagram, in handbook order, each with a runbook label and a one-line training caption.
+- `deck.html` (the slide source, embeds the SVG diagrams) and `build-deck.js` (regenerates the PDF via the headless Chromium bundled with mermaid-cli: `node build-deck.js`).
+
 ## [0.1.1] — 2026-06-24
 
 ### Changed
