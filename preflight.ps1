@@ -46,15 +46,23 @@ function Banner {
     Write-Host ''
 }
 
-# ----------------------------------------------------------- self-elevate --
-if (-not (Test-AdminNow)) {
+# --------------------------------------------- bootstrap: elevate + clean console --
+# When launched via `irm ... | iex`, $PSCommandPath is empty and the piped console makes
+# Read-Host appear to "freeze" until you press Enter. Fix: relaunch from a downloaded FILE
+# in a fresh window (elevated), which gives a proper interactive console. Also self-elevates.
+if ((-not $PSCommandPath) -or (-not (Test-AdminNow))) {
     Banner
-    Write-Host '  This needs Administrator rights to install/fix things.' -ForegroundColor Yellow
-    Write-Host '  Relaunching in an elevated window (accept the UAC prompt)...' -ForegroundColor Yellow
+    $self = Join-Path $env:TEMP 'cmw-preflight.ps1'
+    try { (New-Object System.Net.WebClient).DownloadFile($Url, $self) }
+    catch { try { Invoke-WebRequest $Url -OutFile $self -UseBasicParsing } catch {} }
+    Unblock-File $self -ErrorAction SilentlyContinue
+    $a = @('-NoExit', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $self)
+    Write-Host '  Opening a clean elevated window (accept the UAC prompt if shown)...' -ForegroundColor Yellow
     try {
-        Start-Process powershell -Verb RunAs -ArgumentList '-NoExit', '-NoProfile', '-Command', "irm $Url | iex"
+        if (Test-AdminNow) { Start-Process powershell -ArgumentList $a }
+        else { Start-Process powershell -Verb RunAs -ArgumentList $a }
     } catch {
-        Write-Host '  Elevation was cancelled. Re-run from an Administrator PowerShell.' -ForegroundColor Red
+        Write-Host '  Launch was cancelled. Re-run and accept the prompt.' -ForegroundColor Red
     }
     return
 }
@@ -105,17 +113,6 @@ function Get-Checks {
     $le = (Test-Tcp 'acme-v02.api.letsencrypt.org' 443) -and (Test-Tcp 'acme-staging-v02.api.letsencrypt.org' 443)
     $checks += [pscustomobject]@{ Name = "Internet to Let's Encrypt"; Ok = $le
         Detail = $(if ($le) { 'reachable on :443' } else { 'cannot reach - check firewall/proxy' }); CanFix = $false; Fix = $null }
-
-    $iis = $false; try { $iis = (Get-WindowsFeature Web-Server -ErrorAction Stop).Installed } catch {}
-    $checks += [pscustomobject]@{ Name = 'IIS web server role'; Ok = $iis
-        Detail = $(if ($iis) { 'installed' } else { 'not installed' }); CanFix = $true
-        Fix    = { Install-WindowsFeature Web-Server -IncludeManagementTools | Out-Null
-            Install-WindowsFeature Web-Scripting-Tools -ErrorAction SilentlyContinue | Out-Null } }
-
-    $wa = $false; try { Import-Module WebAdministration -ErrorAction Stop; $wa = $true } catch {}
-    $checks += [pscustomobject]@{ Name = 'IIS PowerShell module'; Ok = $wa
-        Detail = $(if ($wa) { 'available' } else { 'missing (IIS mgmt scripting tools)' }); CanFix = $true
-        Fix    = { Install-WindowsFeature Web-Scripting-Tools -ErrorAction SilentlyContinue | Out-Null } }
 
     $wacsExe = Join-Path $WinAcmePath 'wacs.exe'
     $hasW = Test-Path $wacsExe
@@ -246,7 +243,8 @@ if ($allOk) {
     if ($go -match '^(y|yes)$') { Write-Host ''; Invoke-DnsTest }
 
     Write-Host ''
-    Write-Host '  Next steps:' -ForegroundColor Cyan
+    Write-Host '  ACME + DNS are ready. Per-scenario setup scripts:' -ForegroundColor Cyan
+    Write-Host '   - Set up IIS (role + site/binding) .. scripts\Setup-IIS.ps1' -ForegroundColor Gray
     Write-Host '   - Wildcard / DNS-01 issuance ....... Runbook 02' -ForegroundColor Gray
     Write-Host '   - Public IIS site (HTTP-01) ........ Runbook 01' -ForegroundColor Gray
     Write-Host '   - Replace an existing/vendor cert .. Runbook 08' -ForegroundColor Gray

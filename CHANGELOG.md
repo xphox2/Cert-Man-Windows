@@ -2,6 +2,15 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.8] — 2026-06-24
+
+### Fixed
+- **"Output froze until I pressed Enter" under `irm | iex`.** Piping to `iex` yields a degraded console where `Read-Host` stalls. `preflight.ps1` now bootstraps like MassGrave: it downloads itself to a temp file and relaunches from `-File` in a fresh (elevated) window, giving a proper interactive console. This also replaces the old `irm|iex` self-elevation.
+
+### Changed
+- **Preflight is now scoped to ACME + DNS only** — removed the IIS role/module checks. Per the modular "one script per scenario" approach.
+- **Added `scripts/Setup-IIS.ps1`** — installs the IIS role + management/scripting tools and optionally creates a site with host-name bindings. README Quick start and Runbook 01 Step 0 updated to use it alongside the preflight.
+
 ## [0.1.7] — 2026-06-24
 
 ### Fixed

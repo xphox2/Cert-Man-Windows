@@ -14,9 +14,9 @@ On a new Windows/IIS box, open **PowerShell** and run:
 irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex
 ```
 
-It self-elevates, checks the environment with clean pass/fail output, **offers to auto-fix** what's missing (installs the IIS role and win-acme), loops until everything's green, then optionally runs a **real DNS-01 validation test** against Let's Encrypt staging to prove wildcard issuance works. When it says **READY**, jump to your runbook below.
+It self-elevates (in a clean window), checks **ACME + DNS** with simple pass/fail output, **offers to auto-fix** what's missing (installs the win-acme pluggable build), loops until green, then optionally runs a **real DNS-01 validation test** against Let's Encrypt staging to prove wildcard issuance works. When it says **READY**, jump to your runbook below.
 
-> Prefer a non-interactive/scriptable version (parameters, automation, CI)? Use [`scripts/Preflight-Check.ps1`](scripts/Preflight-Check.ps1).
+> The preflight is intentionally scoped to ACME + DNS. **IIS setup is its own script** — run [`scripts/Setup-IIS.ps1`](scripts/Setup-IIS.ps1) (installs the role + module, optionally creates a site/bindings). A non-interactive/scriptable preflight is also available: [`scripts/Preflight-Check.ps1`](scripts/Preflight-Check.ps1).
 
 ---
 
@@ -102,7 +102,7 @@ flowchart TD
 | [06-Monitoring-and-Alerting.md](06-Monitoring-and-Alerting.md) | Dual-layer monitoring, alert thresholds, expiry checks. |
 | [07-Operations-and-Troubleshooting.md](07-Operations-and-Troubleshooting.md) | Incident runbook, failure modes, gotchas, rate-limit recovery, staging→prod cutover. |
 | [08-Replacing-Existing-Certs.md](08-Replacing-Existing-Certs.md) | **Vendor-agnostic migration** — take over a self-signed/default, GoDaddy, DigiCert, or any cert with Let's Encrypt. Cross-cutting companion to 01/02/03. |
-| [scripts/](scripts/) | Ready-to-run PowerShell: **preflight readiness check**, install, deploy-to-service, monitoring, Posh-ACME renewal, cert inventory + safe removal (migration). |
+| [scripts/](scripts/) | Ready-to-run PowerShell: **preflight (ACME+DNS)**, **IIS setup**, win-acme install, deploy-to-service, monitoring, Posh-ACME renewal, cert inventory + safe removal (migration). |
 | [docs/diagrams/](docs/diagrams/) | All flow diagrams (Mermaid source + SVG/PNG exports) for training and slides. |
 | [docs/training-deck/](docs/training-deck/) | Print-ready [training deck PDF](docs/training-deck/SSL-Cert-Rotation-Training-Deck.pdf) — every diagram in order, one per slide. |
 | [CHANGELOG.md](CHANGELOG.md) | Handbook version history. |

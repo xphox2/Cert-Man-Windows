@@ -53,15 +53,19 @@ flowchart TD
 
 ---
 
-## Step 0 — Preflight (run this first on a fresh box)
+## Step 0 — Preflight + IIS setup (run first on a fresh box)
 
-On a fresh box, just run the interactive one-liner. It self-elevates, checks everything, and offers to auto-install the IIS role and win-acme for you:
+Two small, focused scripts:
 
 ```powershell
+# 1) Install/repair IIS (role + module), optionally create a site with host bindings:
+& "E:\NOC\SSL_Rotation_Windows\scripts\Setup-IIS.ps1" -SiteName MySite -HostNames www.example.com
+
+# 2) Validate ACME + DNS and install win-acme (interactive one-liner):
 irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex
 ```
 
-When it prints **READY**, the IIS role and win-acme are installed and you can **skip Step 1**. (Prefer a parameterized/non-interactive version for automation? Use `scripts\Preflight-Check.ps1` — see its `-Domains/-InstallIIS/-InstallWinAcme` switches.)
+The **preflight** is scoped to ACME + DNS only (internet to Let's Encrypt, win-acme pluggable build, optional DNS-01 test). The **IIS** concern is its own script, `Setup-IIS.ps1`. When the preflight prints **READY** and win-acme is installed, you can **skip Step 1**.
 
 ## Step 1 — Install win-acme
 
