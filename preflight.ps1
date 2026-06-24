@@ -60,18 +60,27 @@ if (-not (Test-AdminNow)) {
 }
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = 'SilentlyContinue'   # makes downloads fast in Windows PowerShell 5.1
 
 # --------------------------------------------------------------- fixers ----
 function Get-WinAcmeRelease {
     Invoke-RestMethod 'https://api.github.com/repos/win-acme/win-acme/releases/latest' -Headers @{ 'User-Agent' = 'cert-man-preflight' }
 }
+function Get-File {
+    param([string]$Url, [string]$Dest)
+    # WebClient is far faster than Invoke-WebRequest for large files in PS 5.1.
+    (New-Object System.Net.WebClient).DownloadFile($Url, $Dest)
+}
 function Install-WinAcmeInline {
+    # Clean reinstall so a previous TRIMMED build can't leave stale files behind.
+    Remove-Item $WinAcmePath -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Path $WinAcmePath -Force | Out-Null
     # Use the PLUGGABLE build (the trimmed build cannot load external DNS plugins).
     $asset = (Get-WinAcmeRelease).assets | Where-Object name -like '*x64.pluggable.zip' | Select-Object -First 1
     if (-not $asset) { throw 'Could not find win-acme pluggable release asset.' }
+    Write-Host ('      downloading win-acme pluggable build ({0} MB)...' -f [math]::Round($asset.size / 1MB, 0)) -ForegroundColor DarkGray
     $zip = Join-Path $env:TEMP 'winacme.zip'
-    Invoke-WebRequest $asset.browser_download_url -OutFile $zip -UseBasicParsing
+    Get-File $asset.browser_download_url $zip
     Expand-Archive $zip $WinAcmePath -Force
     Remove-Item $zip -Force
     Get-ChildItem $WinAcmePath -Include *.dll, *.exe -Recurse | Unblock-File
@@ -81,7 +90,7 @@ function Install-WinAcmePlugin {
     $asset = (Get-WinAcmeRelease).assets | Where-Object { $_.name -like "$Match.*.zip" } | Select-Object -First 1
     if (-not $asset) { throw "win-acme plugin '$Match' not found in latest release." }
     $zip = Join-Path $env:TEMP ($Match + '.zip')
-    Invoke-WebRequest $asset.browser_download_url -OutFile $zip -UseBasicParsing
+    Get-File $asset.browser_download_url $zip
     Expand-Archive $zip $WinAcmePath -Force
     Remove-Item $zip -Force
     Get-ChildItem $WinAcmePath -Include *.dll -Recurse | Unblock-File
@@ -108,13 +117,14 @@ function Get-Checks {
         Detail = $(if ($wa) { 'available' } else { 'missing (IIS mgmt scripting tools)' }); CanFix = $true
         Fix    = { Install-WindowsFeature Web-Scripting-Tools -ErrorAction SilentlyContinue | Out-Null } }
 
-    $hasW = Test-Path (Join-Path $WinAcmePath 'wacs.exe')
-    # The pluggable build extracts many DLLs; the trimmed build has almost none and CANNOT load
-    # DNS provider plugins. Treat a trimmed install as "needs fix" so DNS-01 issuance works.
-    $dllCount = if ($hasW) { @(Get-ChildItem $WinAcmePath -Filter *.dll -ErrorAction SilentlyContinue).Count } else { 0 }
-    $pluggable = $dllCount -gt 10
+    $wacsExe = Join-Path $WinAcmePath 'wacs.exe'
+    $hasW = Test-Path $wacsExe
+    # Reliable build discriminator: pluggable wacs.exe is ~40 MB and CAN load external DNS plugins;
+    # the trimmed build is ~19 MB and cannot. (Both ship 0 loose DLLs, so file size is the signal.)
+    $sizeMB = if ($hasW) { (Get-Item $wacsExe).Length / 1MB } else { 0 }
+    $pluggable = $sizeMB -gt 30
     $checks += [pscustomobject]@{ Name = 'win-acme (pluggable, DNS-capable)'; Ok = ($hasW -and $pluggable)
-        Detail = $(if (-not $hasW) { 'not installed' } elseif (-not $pluggable) { 'trimmed build found - needs pluggable for DNS plugins' } else { "pluggable build at $WinAcmePath" })
+        Detail = $(if (-not $hasW) { 'not installed' } elseif (-not $pluggable) { ('trimmed build (~{0} MB) - needs pluggable for DNS plugins' -f [math]::Round($sizeMB, 0)) } else { "pluggable build at $WinAcmePath" })
         CanFix = $true; Fix = { Install-WinAcmeInline } }
 
     $checks

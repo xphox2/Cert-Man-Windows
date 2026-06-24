@@ -2,6 +2,13 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.7] — 2026-06-24
+
+### Fixed
+- **Slow/hung win-acme download.** `Invoke-WebRequest` in Windows PowerShell 5.1 throttles large downloads via its progress bar (the 35 MB pluggable build could take minutes or appear to hang). `preflight.ps1` and `scripts/Install-WinAcme.ps1` now set `$ProgressPreference = 'SilentlyContinue'` and download via `System.Net.WebClient` — verified **35.6 MB in ~1 second**.
+- **Wrong trimmed-vs-pluggable detection.** Both win-acme builds ship with 0 loose DLLs, so the previous DLL-count check could never pass. Detection now uses the reliable signal: `wacs.exe` size (pluggable ~40 MB vs trimmed ~19 MB; threshold 30 MB). An existing trimmed install is now correctly flagged and upgraded.
+- `Install-WinAcmeInline` now does a clean reinstall (removes the old folder first) so a prior trimmed build leaves nothing stale. Confirmed end-to-end: the pluggable build self-reports as "pluggable, standalone" and exposes `--validation cloudflare` once the plugin is added.
+
 ## [0.1.6] — 2026-06-24
 
 ### Fixed

@@ -48,6 +48,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$ProgressPreference = 'SilentlyContinue'   # makes downloads fast in Windows PowerShell 5.1
+function Get-File { param([string]$Url, [string]$Dest) (New-Object System.Net.WebClient).DownloadFile($Url, $Dest) }
 
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
         ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -80,7 +82,7 @@ if (-not $asset) { throw 'Could not find an x64.pluggable.zip asset on the lates
 
 $zip = Join-Path $env:TEMP $asset.name
 Write-Host "==> Downloading $($asset.name) ($([math]::Round($asset.size/1MB,1)) MB)..."
-Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip
+Get-File $asset.browser_download_url $zip
 
 Write-Host '==> Extracting...'
 Expand-Archive -Path $zip -DestinationPath $InstallPath -Force
@@ -93,7 +95,7 @@ foreach ($p in $DnsPlugin) {
     if (-not $pa) { Write-Warning "DNS plugin '$p' not found in latest release; skipping."; continue }
     Write-Host "==> Installing DNS plugin: $($pa.name)..."
     $pz = Join-Path $env:TEMP $pa.name
-    Invoke-WebRequest -Uri $pa.browser_download_url -OutFile $pz
+    Get-File $pa.browser_download_url $pz
     Expand-Archive -Path $pz -DestinationPath $InstallPath -Force
     Remove-Item $pz -Force
 }
