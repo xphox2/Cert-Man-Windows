@@ -1,0 +1,12 @@
+# Independent SSL/TLS expiry monitoring — source of truth
+# One "host:port" per line. Port defaults to 443 if omitted. '#' starts a comment.
+# Consumed by scripts\Check-CertExpiry.ps1 (see 06-Monitoring-and-Alerting.md).
+#
+# RULE: every certificate automated by any runbook MUST be listed here.
+#
+# Examples (replace with your real endpoints, then delete these):
+# www.example.com:443
+# app.example.com:443
+# rdp.example.com:3389
+# sqlhost.example.com:1433        # direct TLS only; STARTTLS endpoints not supported by the script
+# mywebapp.azurewebsites.net:443

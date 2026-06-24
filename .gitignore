@@ -1,0 +1,23 @@
+# Secrets / credentials — never commit
+*.pfx
+*.pem
+*.key
+*.cer
+*.crt
+settings.local.json
+*.secret
+*.env
+
+# Operational artifacts
+logs/
+*.log
+
+# Local monitored-hosts overrides (commit the template, not real estate)
+monitored-hosts.local.txt
+
+# OS / editor cruft
+Thumbs.db
+desktop.ini
+.DS_Store
+.vs/
+*.swp
