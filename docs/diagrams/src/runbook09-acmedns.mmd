@@ -1,0 +1,15 @@
+flowchart LR
+    subgraph You["You run this once"]
+        ADNS[("acme-dns server<br/>authoritative for auth.xphox.net<br/>:53 + :443 API")]
+    end
+    Client["win-acme / Posh-ACME<br/>(on each cert server)"] -->|"/update TXT via API (X-Api-User/Key)"| ADNS
+    CA["Let's Encrypt"] -->|"1. query _acme-challenge.app.customer.com"| CustDNS[("Customer DNS<br/>Network Solutions, etc.<br/>one static CNAME")]
+    CustDNS -->|"2. CNAME -> uuid.auth.xphox.net"| ADNS
+    ADNS -->|"3. returns TXT"| CA
+
+    classDef srv fill:#1f6feb,stroke:#0b3d91,color:#fff;
+    classDef cust fill:#e2e8f0,stroke:#475569,color:#000;
+    classDef ext fill:#dbeafe,stroke:#1e40af,color:#000;
+    class ADNS srv;
+    class CustDNS cust;
+    class CA,Client ext;

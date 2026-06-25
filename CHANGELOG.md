@@ -2,6 +2,11 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.23] — 2026-06-25
+
+### Added
+- **`09-AcmeDNS-Server-Setup.md`** — full guide to self-hosting an **acme-dns** server (the server side of the no-API-registrar path): DNS subdomain delegation (NS + glue A), `config.cfg` reference, run via Docker / systemd / Windows (NSSM), hardening (`allowfrom` CIDR, `disable_registration`, firewall, DB backup), verification, and per-customer onboarding (register → one CNAME → wire win-acme/Posh-ACME). Covers the **MSP model** (one server, every customer CNAMEs to it). New architecture diagram (`docs/diagrams/runbook09-acmedns.*`); README + diagrams index + Runbook 02 §A linked. Sourced from [acme-dns](https://github.com/acme-dns/acme-dns).
+
 ## [0.1.22] — 2026-06-25
 
 ### Added (DNS provider coverage — works with any registrar)

@@ -90,7 +90,7 @@ The purpose-built tool is **[acme-dns](https://github.com/acme-dns/acme-dns)** �
 Security: the acme-dns credential can *only* set a throwaway `_acme-challenge` TXT — even if it leaks, your real DNS is untouched.
 
 ### Running acme-dns
-- **Self-host (recommended for production):** a single Go binary. Run it on a small host, make it authoritative for a subdomain (delegate `auth.example.com` → the acme-dns host's IP via NS records), reachable on **:53 (UDP/TCP)** + **:80/:443** for its API. As an MSP/NOC you run **one** acme-dns and every customer CNAMEs to it.
+- **Self-host (recommended for production):** a single Go binary; you run **one** server and every customer CNAMEs to it. Full setup (DNS delegation, `config.cfg`, Docker/systemd/Windows, hardening, onboarding) is in **[Runbook 09 — acme-dns Server Setup](09-AcmeDNS-Server-Setup.md)**.
 - **Public test server:** `https://auth.acme-dns.io` for quick validation; self-host for production.
 
 ### Wiring it up with our scripts
