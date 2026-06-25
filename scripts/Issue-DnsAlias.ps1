@@ -155,7 +155,7 @@ Say 'Renew anytime with:  Submit-Renewal -AllOrders   (Posh-ACME stored the plug
 if ($RegisterRenewTask) {
     try {
         # Portable encryption so a SYSTEM-run task can decrypt the stored plugin creds.
-        Set-PAAccount -UseAltPluginEncryption $true -ErrorAction SilentlyContinue
+        Set-PAAccount -UseAltPluginEncryption:$true -ErrorAction SilentlyContinue
         $cmd = "`$env:POSHACME_HOME='C:\ProgramData\Posh-ACME'; Import-Module Posh-ACME; Submit-Renewal -AllOrders"
         $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -ExecutionPolicy Bypass -Command `"$cmd`""
         $trigger = New-ScheduledTaskTrigger -Daily -At 3am
