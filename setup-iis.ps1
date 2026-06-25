@@ -191,7 +191,11 @@ function Get-DnsValidation {
     Write-Host "     5) Other provider - choose from win-acme's full DNS list" -ForegroundColor White
     Write-Host '     6) Manual         - one-off; does NOT auto-renew' -ForegroundColor White
     switch (Read-Host '   Choose 1-6') {
-        '1' { return @{ Args = @('--validation', 'acme-dns'); Plugin = $null; Interactive = $true; Label = 'acme-dns'; AcmeDns = $true } }
+        '1' {
+            $srv = Read-Host '   acme-dns server URL (e.g. https://auth.acme-dns.io to test, or your own)'
+            if (-not $srv) { $srv = 'https://auth.acme-dns.io' }
+            return @{ Args = @('--validation', 'acme-dns', '--acmednsserver', $srv); Plugin = $null; Interactive = $true; Label = "acme-dns ($srv)"; AcmeDns = $true }
+        }
         '2' { $t = Read-Host '   Cloudflare API token'; return @{ Args = @('--validation', 'cloudflare', '--cloudflareapitoken', $t); Plugin = 'plugin.validation.dns.cloudflare'; Interactive = $false; Label = 'Cloudflare' } }
         '3' { $tn = Read-Host '   Azure Tenant ID'; $ci = Read-Host '   Azure Client (App) ID'; $sc = Read-Host '   Azure Client Secret'; $su = Read-Host '   Azure Subscription ID'; $rg = Read-Host '   Azure DNS Resource Group'
             return @{ Args = @('--validation', 'azure', '--azuretenantid', $tn, '--azureclientid', $ci, '--azuresecret', $sc, '--azuresubscriptionid', $su, '--azureresourcegroupname', $rg); Plugin = 'plugin.validation.dns.azure'; Interactive = $false; Label = 'Azure DNS' } }

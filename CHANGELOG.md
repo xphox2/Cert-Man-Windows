@@ -2,6 +2,11 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.26] — 2026-06-25
+
+### Fixed
+- **acme-dns aborted with `missing --acmednsserver`.** win-acme's acme-dns plugin **requires** the `--acmednsserver <url>` argument (it does not prompt for it under our unattended flags). The acme-dns menu option in `preflight.ps1` and `setup-iis.ps1` now asks for the acme-dns server URL (default `https://auth.acme-dns.io`) and passes `--acmednsserver`.
+
 ## [0.1.25] — 2026-06-25
 
 ### Fixed (support every DNS option, no per-provider guessing)
