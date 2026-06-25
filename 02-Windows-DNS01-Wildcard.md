@@ -17,7 +17,7 @@
 > ```powershell
 > irm https://xphox2.github.io/Cert-Man-Windows/setup-iis.ps1 | iex
 > ```
-> The commands below are the manual equivalent if you'd rather drive `wacs.exe` yourself.
+> It supports **Cloudflare, Azure DNS, and GoDaddy** directly, plus a **Manual** option (win-acme shows the TXT record and you create it by hand) for **any other DNS provider**. Manual certs do **not** auto-renew — for hands-off renewal on a 3rd-party DNS, use **CNAME delegation** (§A) instead. The commands below are the manual equivalent if you'd rather drive `wacs.exe` yourself.
 
 ---
 

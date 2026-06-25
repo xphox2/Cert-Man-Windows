@@ -2,6 +2,11 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.18] — 2026-06-24
+
+### Added
+- **`setup-iis.ps1` Manual DNS option (any 3rd-party provider).** A 4th DNS choice runs win-acme's built-in `--validation manual`: it displays the `_acme-challenge` TXT record, you create it at any DNS provider, then continue — interactively (output is shown live, not captured). The staging dry-run is skipped for manual (to avoid creating TXT records twice), and the script clearly warns that **manual certs do not auto-renew unattended** and points to CNAME delegation (Runbook 02 §A) for hands-off renewal on a 3rd-party DNS. Runbook 02 updated.
+
 ## [0.1.17] — 2026-06-24
 
 ### Fixed

@@ -251,8 +251,13 @@ function Invoke-Generate {
 
     $email = Read-Host '   Contact email for the Let''s Encrypt account'
     Write-Host ''
-    Write-Host '   DNS provider:   1) Cloudflare    2) Azure DNS    3) GoDaddy' -ForegroundColor White
-    $choice = Read-Host '   Choose 1-3'
+    Write-Host '   DNS provider for the _acme-challenge record:' -ForegroundColor White
+    Write-Host '     1) Cloudflare    2) Azure DNS    3) GoDaddy' -ForegroundColor White
+    Write-Host '     4) Manual  - any other DNS; win-acme shows the TXT record and you create it by hand' -ForegroundColor White
+    Write-Host '        (Manual certs do NOT auto-renew. For hands-off renewal with a 3rd-party DNS, use' -ForegroundColor DarkGray
+    Write-Host '         CNAME delegation of _acme-challenge to Cloudflare/Azure - see Runbook 02 Section A.)' -ForegroundColor DarkGray
+    $choice = Read-Host '   Choose 1-4'
+    $manual = $false
     $val = switch ($choice) {
         '1' { $t = Read-Host '   Cloudflare API token'; @('--validation', 'cloudflare', '--cloudflareapitoken', $t) }
         '2' {
@@ -262,17 +267,33 @@ function Invoke-Generate {
             @('--validation', 'azure', '--azuretenantid', $tn, '--azureclientid', $ci, '--azuresecret', $sc, '--azuresubscriptionid', $su, '--azureresourcegroupname', $rg)
         }
         '3' { $k = Read-Host '   GoDaddy API key'; $s = Read-Host '   GoDaddy API secret'; @('--validation', 'godaddy', '--apikey', $k, '--apisecret', $s) }
+        '4' { $manual = $true; @('--validation', 'manual') }
         default { $null }
     }
     if (-not $val) { Write-Host '   No provider chosen; aborting generation.' -ForegroundColor Yellow; return }
-    $pluginMatch = switch ($choice) { '1' { 'plugin.validation.dns.cloudflare' } '2' { 'plugin.validation.dns.azure' } '3' { 'plugin.validation.dns.godaddy' } }
-    Status 'FIX' 'DNS provider plugin' 'installing...'
-    try { Install-WinAcmePlugin $pluginMatch; Status 'OK' 'DNS provider plugin' 'installed' }
-    catch { Status 'FAIL' 'DNS provider plugin' $_.Exception.Message; return }
+
+    if ($manual) {
+        Write-Host ''
+        Write-Host '   MANUAL DNS selected:' -ForegroundColor Yellow
+        Write-Host '   - For each certificate, win-acme will print a _acme-challenge TXT record. Create it at your' -ForegroundColor Yellow
+        Write-Host '     DNS provider, wait ~1 minute for it to publish, then follow win-acme''s on-screen prompt.' -ForegroundColor Yellow
+        Write-Host '   - Renewals will ALSO require manual TXT entry, so these certs will NOT auto-renew unattended.' -ForegroundColor Yellow
+    } else {
+        $pluginMatch = switch ($choice) { '1' { 'plugin.validation.dns.cloudflare' } '2' { 'plugin.validation.dns.azure' } '3' { 'plugin.validation.dns.godaddy' } }
+        Status 'FIX' 'DNS provider plugin' 'installing...'
+        try { Install-WinAcmePlugin $pluginMatch; Status 'OK' 'DNS provider plugin' 'installed' }
+        catch { Status 'FAIL' 'DNS provider plugin' $_.Exception.Message; return }
+    }
 
     # --- Staging-first toggle (recommended) --------------------------------
     Write-Host ''
-    $stagingFirst = (Read-Host "  Dry-run on Let's Encrypt STAGING first? (recommended - no rate-limit cost) [Y/n]") -notmatch '^(n|no)$'
+    # Manual DNS would force you to create TXT records twice (staging + prod), so skip staging for it.
+    $stagingFirst = if ($manual) {
+        Write-Host '  Manual DNS: skipping the staging dry-run (you create the TXT record live during issuance below).' -ForegroundColor DarkGray
+        $false
+    } else {
+        (Read-Host "  Dry-run on Let's Encrypt STAGING first? (recommended - no rate-limit cost) [Y/n]") -notmatch '^(n|no)$'
+    }
     if ($stagingFirst) {
         Write-Host ''
         Write-Host '  --- STAGING dry-run (validates DNS-01 end to end; issues + discards test certs) ---' -ForegroundColor Cyan
@@ -315,15 +336,27 @@ function Invoke-Generate {
         $a = @('--baseuri', $ProdUri, '--source', 'manual', '--host', $hostArg) + $val +
              @('--store', 'certificatestore', '--installation', 'iis', '--installationsiteid', "$primary",
                '--emailaddress', $email, '--accepttos', '--friendlyname', "[CertMan] $($p.Title)", '--closeonfinish', '--verbose')
-        $r = Invoke-WacsRetry -Wacs $wacs -WacsArgs $a -IsSuccess { $LASTEXITCODE -eq 0 }
-        $out = $r.Out
-        $out | Out-File -FilePath $log -Encoding utf8
+        if ($manual) {
+            # Interactive: do NOT capture output, so win-acme's TXT-record prompt is visible and
+            # it can read your Enter keypress. (No transient-retry wrapper for the interactive path.)
+            Write-Host '  >>> win-acme will show a TXT record to create. Add it at your DNS, wait ~1 min, then follow its prompt. <<<' -ForegroundColor Yellow
+            & $wacs @a
+            $ok = ($LASTEXITCODE -eq 0)
+        } else {
+            $r = Invoke-WacsRetry -Wacs $wacs -WacsArgs $a -IsSuccess { $LASTEXITCODE -eq 0 }
+            $ok = $r.Ok
+            $r.Out | Out-File -FilePath $log -Encoding utf8
+        }
 
         # win-acme's exit code is the source of truth for success (it issued AND bound).
-        if (-not $r.Ok) {
+        if (-not $ok) {
             Status 'FAIL' $p.Title 'issuance failed'
-            @($out) | Select-Object -Last 20 | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkGray }
-            Write-Host "      Full log: $log" -ForegroundColor Yellow
+            if (-not $manual) {
+                @($r.Out) | Select-Object -Last 20 | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkGray }
+                Write-Host "      Full log: $log" -ForegroundColor Yellow
+            } else {
+                Write-Host "      See win-acme output above, and C:\ProgramData\win-acme logs." -ForegroundColor Yellow
+            }
             continue
         }
         $cert = Find-NewestCovering $p.Sans
@@ -341,7 +374,12 @@ function Invoke-Generate {
         }
     }
     Write-Host ''
-    Write-Host '  Done. win-acme created a renewal task per cert - it auto-renews AND re-binds IIS.' -ForegroundColor Green
+    if ($manual) {
+        Write-Host '  Done. NOTE: manual-DNS certs do NOT auto-renew (renewal needs a manual TXT record too).' -ForegroundColor Yellow
+        Write-Host '  Re-run this script before expiry, or switch to CNAME delegation (Runbook 02 Section A) for hands-off renewal.' -ForegroundColor Yellow
+    } else {
+        Write-Host '  Done. win-acme created a renewal task per cert - it auto-renews AND re-binds IIS.' -ForegroundColor Green
+    }
 }
 
 # ----------------------------------------------------------------- main -----
