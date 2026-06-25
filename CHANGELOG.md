@@ -2,6 +2,11 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.13] — 2026-06-24
+
+### Fixed
+- **`setup-iis.ps1` false-fails on transient Let's Encrypt staging errors.** Staging can return `ServiceUnavailable` / `{"error":"rateLimited","detail":"Service busy; retry later."}` at the finalize step under back-to-back issuance, even though DNS-01 validation already succeeded. Added `Invoke-WacsRetry`, which retries (up to 2×, 15 s apart) **only** on those transient errors — not on real failures (bad DNS token, duplicate-cert rate limit). Applied to both the staging dry-run and production issuance.
+
 ## [0.1.12] — 2026-06-24
 
 ### Added

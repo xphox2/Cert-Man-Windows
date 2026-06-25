@@ -125,6 +125,24 @@ function Install-WinAcmePlugin {
 }
 
 # --------------------------------------------- generation -------------------
+function Invoke-WacsRetry {
+    # Run wacs.exe and retry on TRANSIENT Let's Encrypt errors ("Service busy; retry later",
+    # ServiceUnavailable) - common on staging under back-to-back issuance. Does NOT retry real
+    # failures (bad DNS token, duplicate-cert rate limit, etc.).
+    param([string]$Wacs, [string[]]$WacsArgs, [scriptblock]$IsSuccess, [int]$MaxRetries = 2)
+    $out = $null; $ok = $false
+    for ($attempt = 0; $attempt -le $MaxRetries; $attempt++) {
+        try { $out = & $Wacs @WacsArgs 2>&1 } catch { $out = $_.Exception.Message }
+        $ok = [bool](& $IsSuccess)
+        if ($ok) { break }
+        $transient = [bool](@($out) | Select-String -Quiet -Pattern 'Service busy|retry later|ServiceUnavailable|Service Unavailable')
+        if (-not $transient -or $attempt -eq $MaxRetries) { break }
+        Write-Host "         Let's Encrypt was busy (transient) - retrying in 15s..." -ForegroundColor DarkYellow
+        Start-Sleep -Seconds 15
+    }
+    return [pscustomobject]@{ Ok = $ok; Out = $out }
+}
+
 function Test-StagingCert {
     # Dry-run one cert against Let's Encrypt STAGING: proves DNS-01 works for this exact
     # SAN set without touching production rate limits or binding anything. Returns $true/$false.
@@ -137,10 +155,10 @@ function Test-StagingCert {
     $a = @('--baseuri', $StagingUri, '--source', 'manual', '--host', $hostArg) + $Val +
          @('--store', 'pfxfile', '--pfxfilepath', $tmp, '--pfxpassword', [guid]::NewGuid().ToString('N'),
            '--installation', 'none', '--emailaddress', $Email, '--accepttos', '--friendlyname', $fn, '--closeonfinish', '--verbose')
-    $out = $null
-    try { $out = & $Wacs @a 2>&1 } catch { $out = $_.Exception.Message }
+    $r = Invoke-WacsRetry -Wacs $Wacs -WacsArgs $a -IsSuccess { $LASTEXITCODE -eq 0 }
+    $out = $r.Out
     $out | Out-File -FilePath $log -Encoding utf8
-    $ok = ($LASTEXITCODE -eq 0) -and (Get-ChildItem $tmp -Filter *.pfx -ErrorAction SilentlyContinue)
+    $ok = $r.Ok -and (Get-ChildItem $tmp -Filter *.pfx -ErrorAction SilentlyContinue)
     try { & $Wacs --baseuri $StagingUri --cancel --friendlyname $fn --closeonfinish 2>&1 | Out-Null } catch {}
     Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
     if (-not $ok) {
@@ -214,12 +232,12 @@ function Invoke-Generate {
         $a = @('--baseuri', $ProdUri, '--source', 'manual', '--host', $hostArg) + $val +
              @('--store', 'certificatestore', '--installation', 'iis', '--emailaddress', $email,
                '--accepttos', '--friendlyname', "[CertMan] $($p.Title)", '--closeonfinish', '--verbose')
-        $out = $null
-        try { $out = & $wacs @a 2>&1 } catch { $out = $_.Exception.Message }
+        $r = Invoke-WacsRetry -Wacs $wacs -WacsArgs $a -IsSuccess { $LASTEXITCODE -eq 0 }
+        $out = $r.Out
         $out | Out-File -FilePath $log -Encoding utf8
 
         $cert = Find-NewestCovering $p.Sans
-        if ($LASTEXITCODE -ne 0 -or -not $cert -or (Get-CertSource $cert) -ne "Let's Encrypt") {
+        if (-not $r.Ok -or -not $cert -or (Get-CertSource $cert) -ne "Let's Encrypt") {
             Status 'FAIL' $p.Title 'issuance failed'
             @($out) | Select-Object -Last 20 | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkGray }
             Write-Host "      Full log: $log" -ForegroundColor Yellow
