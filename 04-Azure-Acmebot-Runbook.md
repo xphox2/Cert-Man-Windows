@@ -1,8 +1,35 @@
-# 04 — Azure Web App (Acmebot) Runbook — PRIMARY
+# 04 — Azure Web App Certificates Runbook
 
-**Use this for:** Let's Encrypt certificates on **Azure Web Apps / App Service** (and Functions, Container Apps), with hands-off auto-renewal.
+**Scope:** TLS certificates for **Azure Web Apps / App Service**.
+
+## ⚠️ Decide first: do you actually need Let's Encrypt here?
+
+Azure App Service includes a **free App Service Managed Certificate (ASMC)** that **auto-renews with zero maintenance** — Azure reissues it every ~6 months, **45 days before expiry, and updates the bindings automatically** ([Microsoft Learn](https://learn.microsoft.com/en-us/azure/app-service/configure-ssl-certificate)). For a single hostname, **use the free managed cert — do not run Let's Encrypt.** It's simpler and already does what this whole handbook is about (hands-off rotation).
+
+Reach for **Let's Encrypt via Acmebot** (the rest of this runbook) **only** when the free cert can't do what you need:
+
+| Your need | Use |
+|-----------|-----|
+| Single hostname (apex or subdomain), App Service only | **Free App Service Managed Certificate** (below) — nothing to run |
+| **Wildcard** (`*.example.com`) | **Let's Encrypt via Acmebot** |
+| **Export / reuse** one cert across App Gateway, Front Door, a VM, or on-prem | **Let's Encrypt via Acmebot** |
+| Same CA as your on-prem estate, or private DNS / App Service Environment / client-cert use | **Let's Encrypt via Acmebot** |
+
+ASMC's hard limits (the reason the right column exists): **no wildcard**, **not exportable**, no private DNS, not supported in App Service Environment, no client-cert/thumbprint use ([Microsoft Learn](https://learn.microsoft.com/en-us/azure/app-service/configure-ssl-certificate)).
+
+### Free managed cert — the default path (do this if the table sends you here)
+1. The Web App must be **Basic (B1) or higher**, with the **custom domain already added + verified**.
+2. Web App → **Custom domains** → **Add binding** → **Create App Service Managed Certificate** → pick the hostname → **Create**.
+3. Bind it (**SNI SSL**). Done — Azure issues, renews, and re-binds it automatically. Nothing to deploy, schedule, or monitor.
+
+> Only continue below if you need a **wildcard**, an **exportable/shared** cert, or one of the other right-column cases.
+
+---
+
+## Let's Encrypt via Acmebot (for wildcard / export / multi-service)
+
 **Tool:** **[Acmebot](https://github.com/shibayan)** — an Azure Functions app (with a web dashboard) that issues and renews Let's Encrypt certs into **Azure Key Vault**, from which Azure services auto-import.
-**Validation:** DNS-01 (so wildcards and apex are supported).
+**Validation:** DNS-01 (so **wildcards** and apex are supported — this is the main reason to use it over ASMC).
 **Result:** Cert in Key Vault → App Service syncs it within 24h → renewals are automatic and exempt from rate limits (ARI). No VMs, no scripts.
 
 > Want a scripted/runbook approach with no Functions app instead? Use **[05](05-Azure-PoshACME-Runbook.md)**.
@@ -176,17 +203,9 @@ az webapp config ssl bind -g <rg> -n <webapp> --certificate-thumbprint $THUMB --
 - Web App (and optionally Front Door / App Gateway) auto-importing on renewal, zero downtime.
 - Daily ARI-driven renewal + Azure Monitor alerting + independent expiry monitoring.
 
-## Why Let's Encrypt here instead of the free App Service Managed Certificate?
+## Reminder: you chose Acmebot for a reason
 
-| | App Service Managed Certificate | Let's Encrypt via Acmebot |
-|---|---|---|
-| Cost | Free | Free (tiny Function cost) |
-| **Wildcard** | ❌ Not supported | ✅ Yes |
-| Multi-SAN | Limited | ✅ Yes |
-| Exportable / reusable across services | ❌ No | ✅ Yes (in Key Vault) |
-| Same CA as our on-prem certs | No (DigiCert) | ✅ Yes (one CA everywhere) |
-
-Use the managed cert for a throwaway single subdomain; use this runbook for anything needing wildcard, SAN, export, Front Door/App Gateway sharing, or CA consistency with the Windows estate.
+You should be here only because the free **App Service Managed Certificate** can't cover your case — a **wildcard**, an **exportable/shared** cert (App Gateway, Front Door, VM, on-prem), CA consistency with your on-prem estate, or private DNS / ASE. If your need is just a single hostname on App Service, stop and use the free managed cert (see [Decide first](#️-decide-first-do-you-actually-need-lets-encrypt-here)) — it auto-renews with nothing to operate.
 
 ---
 

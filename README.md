@@ -47,7 +47,7 @@ flowchart TD
     Start([Certificate needed]) --> Q1{What needs<br/>the certificate?}
 
     Q1 -->|Windows Server| W{IIS website<br/>or other service?}
-    Q1 -->|Azure Web App| A{Managed<br/>or scripted?}
+    Q1 -->|Azure Web App| AZ{Single hostname,<br/>or wildcard / export?}
 
     W -->|IIS website| WP{Port 80 reachable<br/>from internet?<br/>Wildcard needed?}
     W -->|"RDP / SQL / Exchange<br/>/ custom HTTP.SYS"| R03["Runbook 03<br/>Non-IIS services<br/>DNS-01 + deploy script"]
@@ -55,18 +55,21 @@ flowchart TD
     WP -->|"Public :80, no wildcard"| R01["Runbook 01<br/>IIS HTTP-01"]
     WP -->|"Internal / :80 blocked<br/>/ wildcard"| R02["Runbook 02<br/>IIS DNS-01 + wildcard"]
 
-    A -->|"Managed, low maintenance"| AB{Single app<br/>or multi-service?}
+    AZ -->|"Single hostname"| ASMC["Free App Service Managed Cert<br/>auto-renews - no Let's Encrypt"]
+    AZ -->|"Wildcard / export<br/>/ multi-service"| A{Managed<br/>or scripted?}
+    A -->|"Managed (Acmebot)"| AB{Single app<br/>or multi-service?}
     A -->|"Scripted, no Functions app"| R05["Runbook 05<br/>Posh-ACME + Automation"]
-
     AB -->|Single Web App| R04a["Runbook 04<br/>App Service Acmebot"]
     AB -->|"App Service + Front Door<br/>+ App Gateway"| R04b["Runbook 04<br/>Key Vault Acmebot"]
 
     classDef rb fill:#1f6feb,stroke:#0b3d91,color:#ffffff,font-weight:bold;
     classDef dec fill:#fff3cd,stroke:#d39e00,color:#000000;
     classDef ep fill:#e2e8f0,stroke:#475569,color:#000000;
+    classDef free fill:#1a7f37,stroke:#0b3d20,color:#ffffff,font-weight:bold;
     class R01,R02,R03,R04a,R04b,R05 rb;
-    class Q1,W,WP,A,AB dec;
+    class Q1,W,WP,AZ,A,AB dec;
     class Start ep;
+    class ASMC free;
 ```
 
 > 📊 **Slide-ready image:** [PNG](docs/diagrams/master-decision-flow.png) · [SVG](docs/diagrams/master-decision-flow.svg) — see [docs/diagrams/](docs/diagrams/) for all flow diagrams.
@@ -78,8 +81,8 @@ flowchart TD
 | Public IIS website, port 80 reachable | **[01](01-Windows-IIS-HTTP01-Runbook.md)** | win-acme | HTTP-01 |
 | Internal IIS, port 80 blocked, **or** any wildcard `*.domain` | **[02](02-Windows-DNS01-Wildcard.md)** | win-acme | DNS-01 |
 | RDP, SQL Server, Exchange, or custom HTTP.SYS service | **[03](03-Windows-NonIIS-Services.md)** | win-acme / Posh-ACME | DNS-01 (usually) |
-| Azure Web App — single app, low maintenance | **[04](04-Azure-Acmebot-Runbook.md)** | App Service Acmebot | DNS-01 |
-| Azure — cert shared across App Service + Front Door + App Gateway | **[04](04-Azure-Acmebot-Runbook.md)** | Key Vault Acmebot | DNS-01 |
+| Azure Web App — **single hostname**, App Service only | Azure **free managed certificate** (no Let's Encrypt needed; see [04](04-Azure-Acmebot-Runbook.md)) | built-in | auto-renews |
+| Azure Web App — **wildcard**, or export/reuse across services | **[04](04-Azure-Acmebot-Runbook.md)** | App Service / Key Vault Acmebot | DNS-01 |
 | Azure — scripted/runbook approach, no Functions app | **[05](05-Azure-PoshACME-Runbook.md)** | Posh-ACME + Automation | DNS-01 |
 | Host already serves a cert from **another CA or a self-signed default** | **[08](08-Replacing-Existing-Certs.md)** (+ 01/02/03) | win-acme | per host |
 
@@ -107,7 +110,7 @@ flowchart TD
 | [01-Windows-IIS-HTTP01-Runbook.md](01-Windows-IIS-HTTP01-Runbook.md) | Public IIS sites — win-acme HTTP-01, fully unattended. |
 | [02-Windows-DNS01-Wildcard.md](02-Windows-DNS01-Wildcard.md) | Internal IIS + wildcard — win-acme DNS-01 (Azure / Cloudflare / GoDaddy, on-prem CNAME delegation). |
 | [03-Windows-NonIIS-Services.md](03-Windows-NonIIS-Services.md) | RDP, SQL Server, Exchange, custom HTTP.SYS — post-renewal binding scripts. |
-| [04-Azure-Acmebot-Runbook.md](04-Azure-Acmebot-Runbook.md) | **Primary Azure path** — App Service / Key Vault Acmebot. |
+| [04-Azure-Acmebot-Runbook.md](04-Azure-Acmebot-Runbook.md) | **Azure Web App certs** — decide first: free managed cert for a single hostname, or Acmebot (Let's Encrypt) for wildcard/export/multi-service. |
 | [05-Azure-PoshACME-Runbook.md](05-Azure-PoshACME-Runbook.md) | Alternative Azure path — Posh-ACME + Azure Automation runbook. |
 | [06-Monitoring-and-Alerting.md](06-Monitoring-and-Alerting.md) | Dual-layer monitoring, alert thresholds, expiry checks. |
 | [07-Operations-and-Troubleshooting.md](07-Operations-and-Troubleshooting.md) | Incident runbook, failure modes, gotchas, rate-limit recovery, staging→prod cutover. |
@@ -127,4 +130,4 @@ flowchart TD
 - **[Posh-ACME](https://poshac.me/)** + **[Posh-ACME.Deploy](https://github.com/rmbolger/Posh-ACME.Deploy)** — PowerShell-native ACME client for complex/non-IIS deployments and Azure runbooks. 100+ DNS plugins.
 - **[App Service Acmebot](https://github.com/shibayan/appservice-acmebot)** / **[Key Vault Acmebot](https://github.com/shibayan/keyvault-acmebot)** — Azure Functions apps (with dashboard) that fully automate Let's Encrypt for Azure, storing certs in Key Vault for hands-off auto-rotation.
 
-> **Not** the same as the built-in **App Service Managed Certificate** (free, DigiCert-issued, no wildcard, non-exportable). We use Let's Encrypt for wildcard support, export/portability, and a single CA across on-prem + cloud. See [04](04-Azure-Acmebot-Runbook.md) for the comparison.
+> **On Azure, try the free built-in cert first.** Azure App Service includes a free **App Service Managed Certificate** that auto-renews with zero maintenance — for a **single hostname**, use it and skip Let's Encrypt entirely. Reach for Acmebot/Let's Encrypt **only** for **wildcards**, an **exportable** cert reused across services (App Gateway, Front Door, on-prem), or CA consistency with your on-prem estate. See **[Runbook 04 — Decide first](04-Azure-Acmebot-Runbook.md)**.

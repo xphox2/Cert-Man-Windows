@@ -2,6 +2,12 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.20] — 2026-06-25
+
+### Changed (Azure guidance is now decision-first)
+- **Runbook 04 leads with the decision, not Acmebot.** Azure App Service includes a **free, auto-renewing App Service Managed Certificate** (reissued ~6-monthly, 45 days before expiry, bindings updated automatically). For a **single hostname you should use that and skip Let's Encrypt** — the runbook now opens with that decision and a one-step "free managed cert" path. Acmebot/Let's Encrypt is positioned as the answer **only** for what the free cert can't do: **wildcards**, **exportable/shared** certs (App Gateway, Front Door, VM, on-prem), CA consistency, private DNS, or App Service Environment.
+- **README** updated to match: the master decision-flow diagram now routes Azure *single hostname → free managed cert* (vs *wildcard/export → Acmebot*), the quick-lookup table and Azure note are decision-first, and the diagram SVG/PNG + training-deck PDF were re-rendered. Sourced from [Microsoft Learn](https://learn.microsoft.com/en-us/azure/app-service/configure-ssl-certificate) (ASMC limits: no wildcard, not exportable, no private DNS / ASE / client-cert).
+
 ## [0.1.19] — 2026-06-24
 
 ### Documentation accuracy pass (sync docs/flows with the validated implementation)
