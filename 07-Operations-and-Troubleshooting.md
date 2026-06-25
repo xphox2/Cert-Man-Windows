@@ -19,7 +19,7 @@ Get-ScheduledTaskInfo -TaskName (Get-ScheduledTask -TaskPath "\win-acme*\").Task
 Get-ChildItem "$env:programdata\win-acme\*\Log\*.txt" -Recurse |
   Sort LastWriteTime -Desc | Select -First 1 | Get-Content -Tail 60
 ```
-For **Azure**: open Acmebot's Application Insights failures, or the Automation Account's failed job stream.
+For **Azure**: open the Automation Account's failed job stream for the Posh-ACME runbook ([05](05-Azure-PoshACME-Runbook.md)). *(A free App Service Managed Certificate has no job to check — Azure renews it.)*
 
 ### 2. Force a renewal with full logging
 
@@ -54,8 +54,8 @@ Verify the served cert has a fresh expiry, then record the cause in the incident
 | Renewal "succeeds" but service still serves old cert | Non-IIS service didn't re-bind (post-renewal script missing/failed) | Add/repair the `--installation script` hook ([03](03-Windows-NonIIS-Services.md)); re-run the deploy script manually |
 | Scheduled task runs, nothing renews | `wacs.exe` moved/deleted, or renewal store lost | Reinstall to the **same path**; re-create the renewal |
 | Can't export PFX for a non-IIS service | Cert stored with non-exportable key | Re-issue with `--store pfxfile`, or set the store to allow export *before* issuance |
-| Azure Web App not picking up renewed cert | Imported a **version-specific** Key Vault id, or App Service lost `Key Vault Certificate User` | Re-import with the **non-version-specific** id; re-grant the role ([04](04-Azure-Acmebot-Runbook.md)) |
-| Acmebot DNS step fails | Function managed identity missing **DNS Zone Contributor** on the zone | Grant the role scoped to the zone ([04 Step 2](04-Azure-Acmebot-Runbook.md#step-2--grant-the-functions-managed-identity-its-roles-least-privilege)) |
+| Azure Web App not picking up renewed cert | Imported a **version-specific** Key Vault id, or App Service lost `Key Vault Certificate User` | Re-import with the **non-version-specific** id; re-grant the role ([05](05-Azure-PoshACME-Runbook.md#step-5--bind-the-cert-to-the-web-app)) |
+| Azure DNS-01 fails | Automation managed identity missing **DNS Zone Contributor** on the zone | Grant the role scoped to the zone ([05](05-Azure-PoshACME-Runbook.md#step-1--identity--permissions)) |
 | Browser shows "(STAGING)" / untrusted issuer | Cert came from the **staging** endpoint | Cut over to production (below) and re-issue |
 
 ---
@@ -101,12 +101,7 @@ Every runbook references this. The mechanism is the same everywhere: **the ACME 
 2. `.\wacs.exe --cancel --friendlyname "<staging renewal>"`.
 3. Re-run the original issuance command. Verify the issuer is a real LE intermediate and the browser trusts it.
 
-**Acmebot**
-1. Set the Function's ACME endpoint setting to production; restart the Function App.
-2. Delete + re-add the cert order in the dashboard.
-3. Re-import to the Web App (or wait ≤24h); verify trust.
-
-**Posh-ACME / Automation**
+**Azure (Posh-ACME / Automation, Runbook 05)**
 1. Change `Set-PAServer`/`-DirectoryUrl` to production.
 2. Run the runbook once manually; verify the vault has a production cert and the Web App syncs.
 

@@ -16,7 +16,7 @@ flowchart LR
     end
     subgraph L2["Layer 2 — Renewal success (catch the cause)"]
         B1[win-acme email / task result]
-        B2[Acmebot App Insights alert]
+        B2[Azure Monitor near-expiry alert]
         B3[Automation failed-job alert]
         B4[Certificate Transparency watch]
     end
@@ -95,12 +95,11 @@ For public endpoints, a third-party monitor (e.g. [SSLMate Cert Spotter](https:/
    Wire this into your monitoring agent (Zabbix/SCOM/NinjaOne/etc.) as a check on `LastTaskResult` and `LastRunTime` freshness.
 3. **Event log / file log** — win-acme writes to the Application event log (source `win-acme`) and `%programdata%\win-acme\...\Log`. Forward `Error`-level events to your SIEM.
 
-### Acmebot (Azure)
+### Azure free managed certificate
 
-- **Application Insights** is wired in by deployment. Alert on Function **failures/exceptions** (see [04 Step 7](04-Azure-Acmebot-Runbook.md#step-7--confirm-auto-renewal--monitor)).
-- Optional **webhook** on success/failure → Teams/Slack.
+- Azure issues, renews, and re-binds it automatically, so there's no renewal job to watch. Rely on **Layer 1 (expiry on the wire)** as the cross-check, and optionally an **Azure Monitor** alert on the App Service certificate nearing expiry.
 
-### Posh-ACME in Azure Automation
+### Posh-ACME in Azure Automation (Runbook 05)
 
 - Alert on **failed runbook jobs** (Automation Account → Alerts, or Log Analytics `AzureDiagnostics | where Category=='JobStreams' and ResultType=='Failed'`).
 
@@ -115,7 +114,7 @@ Every publicly trusted issuance is logged to **CT logs**. Watching CT for your d
 When you finish any runbook, do all three:
 
 - [ ] Add `host:port` to `monitored-hosts.txt` (Layer 1).
-- [ ] Confirm the tool's failure alert is active (Layer 2: win-acme email / Acmebot App Insights / Automation job alert).
+- [ ] Confirm the tool's failure alert is active (Layer 2: win-acme email / Azure Automation failed-job alert). *(Free Azure managed certs need no Layer-2 alert — Azure renews them.)*
 - [ ] For public certs, add a CT-log watch and/or external SSL monitor.
 
 ---
@@ -124,7 +123,7 @@ When you finish any runbook, do all three:
 
 - Count of certs by **days-to-expiry bucket** (>30 / 15–30 / 7–15 / <7) from `Check-CertExpiry.ps1` output.
 - win-acme **task LastTaskResult** per server (green/red).
-- Acmebot **Function failure rate** (App Insights).
+- Azure Automation **failed jobs** (Posh-ACME runbook, last 7 days).
 - Automation **failed jobs** (last 7 days).
 
 ---

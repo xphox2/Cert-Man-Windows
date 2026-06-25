@@ -1,12 +1,12 @@
-# 05 — Azure Web App (Posh-ACME + Automation) Runbook — ALTERNATIVE
+# 05 — Azure Web App: Let's Encrypt via Posh-ACME (our automation)
 
-**Use this instead of [04](04-Azure-Acmebot-Runbook.md) when** you want a **scripted, transparent** path with no Functions app to operate — e.g. you already run **Azure Automation**, you want the logic in source control, or policy discourages deploying the Acmebot Function.
+**Use this when** the free App Service Managed Certificate can't cover your case — a **wildcard**, an **exportable/shared** cert, or CA consistency with your on-prem estate (see [Runbook 04 — Decide first](04-Azure-WebApp-Certs.md)). This is **our** Azure Let's Encrypt path: our script wrapping an ACME client, no third-party application deployed in your tenant.
 
-**Tool:** [Posh-ACME](https://poshac.me/) running in an **Azure Automation** runbook on a schedule.
+**Tool:** our [`scripts/Renew-PoshACME.ps1`](scripts/Renew-PoshACME.ps1) (Azure mode), driving the **[Posh-ACME](https://poshac.me/)** PowerShell module (an ACME client — the Azure analogue of win-acme on Windows), running as an **Azure Automation** runbook on a schedule.
 **Validation:** DNS-01 via **Azure DNS** (wildcards supported).
-**Result:** A runbook issues/renews the Let's Encrypt cert, uploads it to **Key Vault**, and the Web App auto-imports it — same end state as Acmebot, but you own the script.
+**Result:** the runbook issues/renews the Let's Encrypt cert, uploads it to **Key Vault**, and the Web App auto-imports it — fully under your control, in source.
 
-> **Trade-off:** more moving parts to maintain (module imports, state in Storage, your own renewal logic) and no dashboard. If you don't have a specific reason to script it, prefer **[04](04-Azure-Acmebot-Runbook.md)**.
+> Only the Posh-ACME module is a dependency (like win-acme on Windows). The orchestration is our script; you own and can audit it.
 
 ---
 
@@ -67,7 +67,7 @@ az role assignment create --assignee $PRINCIPAL --role "Storage Blob Data Contri
   --scope "/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Storage/storageAccounts/<sa>"
 ```
 
-And let App Service read the vault (well-known principal, as in [04 Step 3](04-Azure-Acmebot-Runbook.md#step-3--let-app-service-read-certs-from-key-vault)):
+And let App Service read the vault. `abfa0a7c-a6b6-4736-8310-5855508787cd` is Microsoft's global **Microsoft.Azure.WebSites** service principal (same in every tenant); this lets the Web App import the cert from Key Vault:
 
 ```bash
 az role assignment create --assignee "abfa0a7c-a6b6-4736-8310-5855508787cd" \
@@ -125,7 +125,7 @@ Automation Account → **Schedules** → create a **daily** schedule, link it to
 
 ## Step 5 — Bind the cert to the Web App
 
-Identical to [04 Step 5](04-Azure-Acmebot-Runbook.md#step-5--bind-the-cert-to-the-web-app):
+Import the Key Vault cert into the Web App (using the **non-version-specific** Key Vault reference) and bind it as SNI SSL:
 
 ```bash
 az webapp config ssl import -g <rg> -n <webapp> --key-vault <vault> --key-vault-certificate-name example-com

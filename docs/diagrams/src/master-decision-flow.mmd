@@ -11,17 +11,13 @@ flowchart TD
     WP -->|"Internal / :80 blocked<br/>/ wildcard"| R02["Runbook 02<br/>IIS DNS-01 + wildcard"]
 
     AZ -->|"Single hostname"| ASMC["Free App Service Managed Cert<br/>auto-renews - no Let's Encrypt"]
-    AZ -->|"Wildcard / export<br/>/ multi-service"| A{Managed<br/>or scripted?}
-    A -->|"Managed (Acmebot)"| AB{Single app<br/>or multi-service?}
-    A -->|"Scripted, no Functions app"| R05["Runbook 05<br/>Posh-ACME + Automation"]
-    AB -->|Single Web App| R04a["Runbook 04<br/>App Service Acmebot"]
-    AB -->|"App Service + Front Door<br/>+ App Gateway"| R04b["Runbook 04<br/>Key Vault Acmebot"]
+    AZ -->|"Wildcard / export<br/>/ multi-service"| R05["Runbook 05<br/>Let's Encrypt via Posh-ACME<br/>(our Automation runbook)"]
 
     classDef rb fill:#1f6feb,stroke:#0b3d91,color:#ffffff,font-weight:bold;
     classDef dec fill:#fff3cd,stroke:#d39e00,color:#000000;
     classDef ep fill:#e2e8f0,stroke:#475569,color:#000000;
     classDef free fill:#1a7f37,stroke:#0b3d20,color:#ffffff,font-weight:bold;
-    class R01,R02,R03,R04a,R04b,R05 rb;
-    class Q1,W,WP,AZ,A,AB dec;
+    class R01,R02,R03,R05 rb;
+    class Q1,W,WP,AZ dec;
     class Start ep;
     class ASMC free;

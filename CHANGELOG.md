@@ -2,6 +2,13 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.21] — 2026-06-25
+
+### Changed (drop the third-party Acmebot dependency — build it ourselves)
+- **Removed the community "Acmebot" Functions app** from the handbook. Our principle, now stated explicitly: we use ACME client **tools** (win-acme on Windows, **Posh-ACME** on Azure) wrapped in **our own scripts** — we do **not** deploy third-party **applications** into the tenant.
+- **Azure Let's Encrypt is now our `Renew-PoshACME.ps1` Azure Automation runbook** ([Runbook 05](05-Azure-PoshACME-Runbook.md)), promoted from "alternative" to the path. Runbook 04 is now **`04-Azure-WebApp-Certs.md`** (renamed): decide-first — free managed cert for a single hostname, our Posh-ACME runbook for wildcard/export/multi-service.
+- Updated the master decision-flow diagram (Azure → free managed cert **or** Runbook 05; no Acmebot nodes), README tables/tools/notes, and the Acmebot references in Runbooks 00/06/07. Removed the Acmebot architecture diagram; re-rendered the master + monitoring diagrams and rebuilt the training deck (now 9 pages).
+
 ## [0.1.20] — 2026-06-25
 
 ### Changed (Azure guidance is now decision-first)

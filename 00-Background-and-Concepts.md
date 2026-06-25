@@ -42,7 +42,7 @@ Let's Encrypt is ahead of that curve:
 4. **Validation** — the CA checks the challenge.
 5. **Issuance** — once all names are validated, the client submits a CSR and the CA returns the signed certificate.
 
-You rarely touch this directly — win-acme, Posh-ACME, and Acmebot do it for you. But the **challenge type** is a decision you *do* make, because it determines which runbook applies.
+You rarely touch this directly — win-acme (Windows) and Posh-ACME (Azure) do it for you. But the **challenge type** is a decision you *do* make, because it determines which runbook applies.
 
 ---
 
@@ -111,7 +111,7 @@ Staging mirrors production but with far higher limits. Its certs are issued by *
 
 ### ARI — renewals don't count against limits
 
-**ACME Renewal Information** ([RFC 9773](https://datatracker.ietf.org/doc/html/rfc9773/)) lets the CA tell the client *when* to renew, and **ARI-driven renewals are exempt from rate limits**. Acmebot and modern clients use it automatically. Practical upshot: you can't accidentally rate-limit yourself by renewing — only by issuing many *new* distinct certs. Prefer ARI-aware clients; don't disable it.
+**ACME Renewal Information** ([RFC 9773](https://datatracker.ietf.org/doc/html/rfc9773/)) lets the CA tell the client *when* to renew, and **ARI-driven renewals are exempt from rate limits**. Modern ACME clients use it automatically. Practical upshot: you can't accidentally rate-limit yourself by renewing — only by issuing many *new* distinct certs. Prefer ARI-aware clients; don't disable it.
 
 ---
 
