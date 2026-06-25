@@ -92,11 +92,14 @@ function Get-RegistrableDomain {
 function Find-NewestCovering {
     param([string[]]$Sans)
     $best = $null
-    foreach ($c in (Get-ChildItem Cert:\LocalMachine\My -ErrorAction SilentlyContinue)) {
-        if ($c.NotAfter -lt (Get-Date)) { continue }
-        $names = @($c.DnsNameList | ForEach-Object { $_.Unicode.ToLower() })
-        $all = $true; foreach ($s in $Sans) { if ($names -notcontains $s.ToLower()) { $all = $false; break } }
-        if ($all -and (-not $best -or $c.NotBefore -gt $best.NotBefore)) { $best = $c }
+    # Search both stores: win-acme puts IIS-installed certs in WebHosting, not My.
+    foreach ($store in 'My', 'WebHosting') {
+        foreach ($c in (Get-ChildItem "Cert:\LocalMachine\$store" -ErrorAction SilentlyContinue)) {
+            if ($c.NotAfter -lt (Get-Date)) { continue }
+            $names = @($c.DnsNameList | ForEach-Object { $_.Unicode.ToLower() })
+            $all = $true; foreach ($s in $Sans) { if ($names -notcontains $s.ToLower()) { $all = $false; break } }
+            if ($all -and (-not $best -or $c.NotBefore -gt $best.NotBefore)) { $best = $c }
+        }
     }
     return $best
 }
@@ -135,7 +138,7 @@ function Invoke-WacsRetry {
         try { $out = & $Wacs @WacsArgs 2>&1 } catch { $out = $_.Exception.Message }
         $ok = [bool](& $IsSuccess)
         if ($ok) { break }
-        $transient = [bool](@($out) | Select-String -Quiet -Pattern 'Service busy|retry later|ServiceUnavailable|Service Unavailable')
+        $transient = [bool](@($out) | Select-String -Quiet -Pattern 'Service busy|retry later|ServiceUnavailable|Service Unavailable|Certificate not found')
         if (-not $transient -or $attempt -eq $MaxRetries) { break }
         Write-Host "         Let's Encrypt was busy (transient) - retrying in 15s..." -ForegroundColor DarkYellow
         Start-Sleep -Seconds 15
@@ -239,17 +242,20 @@ function Invoke-Generate {
         $out = $r.Out
         $out | Out-File -FilePath $log -Encoding utf8
 
-        $cert = Find-NewestCovering $p.Sans
-        if (-not $r.Ok -or -not $cert -or (Get-CertSource $cert) -ne "Let's Encrypt") {
+        # win-acme's exit code is the source of truth for success (it issued AND bound).
+        if (-not $r.Ok) {
             Status 'FAIL' $p.Title 'issuance failed'
             @($out) | Select-Object -Last 20 | ForEach-Object { Write-Host "      $_" -ForegroundColor DarkGray }
             Write-Host "      Full log: $log" -ForegroundColor Yellow
             continue
         }
-        Status 'OK' $p.Title ("issued + bound, expires {0}" -f $cert.NotAfter.ToString('yyyy-MM-dd'))
+        $cert = Find-NewestCovering $p.Sans
+        $exp = if ($cert) { $cert.NotAfter.ToString('yyyy-MM-dd') } else { 'check store' }
+        Status 'OK' $p.Title ("issued + bound to IIS, expires {0}" -f $exp)
 
         # If this wildcard's hosts span more than one IIS site, bind the extras too.
-        if ($gids.Count -gt 1) {
+        if ($gids.Count -gt 1 -and $cert) {
+            $storeOfCert = ($cert.PSParentPath -split '\\')[-1]
             foreach ($h in $p.BindHosts) {
                 foreach ($sid in @($SiteIdMap[$h])) {
                     if ($sid -eq $primary) { continue }
@@ -257,7 +263,7 @@ function Invoke-Generate {
                     try {
                         $bnd = Get-WebBinding -Name $sname -Protocol https -HostHeader $h -ErrorAction SilentlyContinue
                         if (-not $bnd) { New-WebBinding -Name $sname -Protocol https -Port 443 -HostHeader $h -SslFlags 1 -ErrorAction Stop; $bnd = Get-WebBinding -Name $sname -Protocol https -HostHeader $h }
-                        $bnd.AddSslCertificate($cert.Thumbprint, 'My') | Out-Null
+                        $bnd.AddSslCertificate($cert.Thumbprint, $storeOfCert) | Out-Null
                         Write-Host ("      also bound {0} on site {1}" -f $h, $sname) -ForegroundColor DarkGray
                     } catch { Write-Host ("      could not bind {0} on {1}: {2}" -f $h, $sname, $_.Exception.Message) -ForegroundColor Yellow }
                 }

@@ -2,6 +2,13 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.15] — 2026-06-24
+
+### Fixed
+- **`setup-iis.ps1` reported FAIL even when issuance + binding succeeded.** win-acme installs IIS certs into the **`WebHosting`** store, but the script's coverage check only searched `My`. `Find-NewestCovering` now searches both `My` and `WebHosting` (so the plan also detects already-installed certs), and the production result is now gated on win-acme's **exit code** (the source of truth) rather than a store lookup.
+- **Added `Certificate not found` to the transient-retry set.** A post-finalize `acme:error:malformed "Certificate not found"` (seen once on one of three back-to-back orders) is transient; `Invoke-WacsRetry` now retries it.
+- Multi-site wildcard binding now uses the certificate's actual store (`WebHosting`) instead of assuming `My`.
+
 ## [0.1.14] — 2026-06-24
 
 ### Fixed
