@@ -2,6 +2,12 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.29] — 2026-06-25
+
+### Added (auto-distribute renewed certs)
+- **Post-renewal copy hook** in `setup-iis.ps1`. When PFX export is on, it offers to auto-copy the PFX to other devices after **every** renewal: it generates a self-contained `C:\CertMan\post-renew-copy.ps1` (destinations baked in — no parameter-quoting issues) and wires it as a win-acme post-renewal step (`--installation iis,script --script ...`). Logs to `C:\CertMan\post-renew-copy.log`. Warns that renewals run as SYSTEM, so UNC targets must allow the computer account (else use a local share the devices pull from).
+- **`scripts/Copy-RenewedPfx.ps1`** — standalone parameterized version of the same hook for manual win-acme wiring (`-SourceDir`, `-Destinations`, `-LogFile`).
+
 ## [0.1.28] — 2026-06-25
 
 ### Added
