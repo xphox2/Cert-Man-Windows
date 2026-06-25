@@ -2,6 +2,14 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.28] — 2026-06-25
+
+### Added
+- **`setup-iis.ps1` PFX export option** — after planning the certs, it now offers to also export a `.pfx` of each cert (default `C:\CertMan\pfx`, password-protected) alongside the IIS binding, by adding `pfxfile` to the win-acme store set (`--store certificatestore,pfxfile`). The PFX is **refreshed on every renewal**, so the same cert can be copied to **other devices / non-IIS services** (then bound with the `scripts\Deploy-*.ps1` helpers). Per-cert and final output print the PFX paths.
+
+### Confirmed
+- **win-acme follows `_acme-challenge` CNAMEs** to a delegated zone automatically (`Validation.AllowDnsSubstitution = true` by default) — so CNAME delegation to a zone you control (e.g. a Cloudflare zone) works directly with win-acme/`setup-iis.ps1`, no acme-dns server and no Posh-ACME required. Sources: [win-acme settings](https://www.win-acme.com/reference/settings), [DNS validation](https://www.win-acme.com/reference/plugins/validation/dns/).
+
 ## [0.1.27] — 2026-06-25
 
 ### Added (Windows/PowerShell-native path for no-API registrars)

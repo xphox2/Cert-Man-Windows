@@ -318,6 +318,19 @@ function Invoke-Generate {
         Write-Host ("   $($sel.Label): win-acme will prompt for this provider's credentials during issuance (and stores them for renewal).") -ForegroundColor Yellow
     }
 
+    # --- Optional PFX export (for other devices / non-IIS services) --------
+    $pfxDir = $null; $pfxPw = $null
+    Write-Host ''
+    if ((Read-Host '  Also export a PFX of each cert (to copy to other devices/services)? [y/N]') -match '^(y|yes)$') {
+        $d = Read-Host ('  PFX output folder [default C:\CertMan\pfx]')
+        $pfxDir = if ($d) { $d } else { 'C:\CertMan\pfx' }
+        New-Item -ItemType Directory -Path $pfxDir -Force | Out-Null
+        $pfxPw = Read-Host '  PFX password (protects the exported file)'
+        if (-not $pfxPw) { $pfxPw = [guid]::NewGuid().ToString('N'); Write-Host "  (no password entered - generated one: $pfxPw )" -ForegroundColor DarkGray }
+        # win-acme renews into the same store set, so the PFX is refreshed on every renewal too.
+        Write-Host "  PFX(s) will be written to $pfxDir and refreshed on each renewal." -ForegroundColor DarkGray
+    }
+
     # --- Staging-first toggle (recommended) --------------------------------
     Write-Host ''
     # Interactive providers (acme-dns / manual / prompt-for-creds) skip the automated staging dry-run.
@@ -366,8 +379,10 @@ function Invoke-Generate {
         $log = Join-Path $WinAcmePath ("issue-{0}.log" -f ($p.Base -replace '[^a-z0-9]', '_'))
         # Wildcard + manual source REQUIRES --installationsiteid. win-acme then binds the covered
         # hosts in that site AND re-binds them on every renewal.
-        $a = @('--baseuri', $ProdUri, '--source', 'manual', '--host', $hostArg) + $val +
-             @('--store', 'certificatestore', '--installation', 'iis', '--installationsiteid', "$primary",
+        # Store: always the Windows cert store (for IIS); optionally ALSO a pfxfile for other devices.
+        $storeArgs = if ($pfxDir) { @('--store', 'certificatestore,pfxfile', '--pfxfilepath', $pfxDir, '--pfxpassword', $pfxPw) } else { @('--store', 'certificatestore') }
+        $a = @('--baseuri', $ProdUri, '--source', 'manual', '--host', $hostArg) + $val + $storeArgs +
+             @('--installation', 'iis', '--installationsiteid', "$primary",
                '--emailaddress', $email, '--accepttos', '--friendlyname', "[CertMan] $($p.Title)", '--closeonfinish', '--verbose')
         if ($interactive) {
             # acme-dns / manual: interactive, do NOT capture output (win-acme prompts for the endpoint/
@@ -397,6 +412,10 @@ function Invoke-Generate {
         $cert = Find-NewestCovering $p.Sans
         $exp = if ($cert) { $cert.NotAfter.ToString('yyyy-MM-dd') } else { 'check store' }
         Status 'OK' $p.Title ("issued, expires {0}" -f $exp)
+        if ($pfxDir) {
+            $pfx = @(Get-ChildItem $pfxDir -Filter '*.pfx' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
+            if ($pfx) { Write-Host ("      PFX exported: {0}  (password as entered)" -f $pfx[0].FullName) -ForegroundColor DarkGray }
+        }
 
         # win-acme's --installationsiteid binds only the primary site; reconcile EVERY covered host
         # across ALL of its sites so multi-site wildcards are fully bound.
@@ -414,6 +433,11 @@ function Invoke-Generate {
         Write-Host '  Re-run before expiry, or use acme-dns (Runbook 02 Section A) for hands-off renewal.' -ForegroundColor Yellow
     } else {
         Write-Host '  Done. win-acme created a renewal task per cert - it auto-renews AND re-binds IIS.' -ForegroundColor Green
+    }
+    if ($pfxDir) {
+        Write-Host ("  PFX files for other devices/services are in: {0}" -f $pfxDir) -ForegroundColor Green
+        Write-Host '  Copy them to each device and import/bind (see scripts\Deploy-*.ps1 for RDP/SQL/Exchange/HTTP.SYS).' -ForegroundColor DarkGray
+        Write-Host '  They are refreshed automatically on every renewal - re-distribute (or script a copy) after each renew.' -ForegroundColor DarkGray
     }
 }
 
