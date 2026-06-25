@@ -2,6 +2,11 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.30] — 2026-06-25
+
+### Added (per-domain DNS credentials)
+- **`setup-iis.ps1` now selects DNS per registrable domain.** It detects the distinct zones across the planned certs (e.g. `xphox.net`, `xphox.com`, `technicallabs.org`) and — when there's more than one — asks whether **one provider/API key manages them all** or you need **a different provider/key per domain**. Each cert then issues, dry-runs (staging), and renews using its own domain's DNS selection; plugins install once per distinct provider; staging-first and the manual/auto-renew notes are evaluated per cert. Single-domain runs are unchanged (one prompt).
+
 ## [0.1.29] — 2026-06-25
 
 ### Added (auto-distribute renewed certs)

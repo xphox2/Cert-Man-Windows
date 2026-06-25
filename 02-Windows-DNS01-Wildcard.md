@@ -143,6 +143,8 @@ The rest of this runbook then proceeds exactly as for a normal API-hosted zone.
 ---
 
 > **Provider coverage (no assumptions):** the scripts' DNS menu offers **acme-dns**, **Cloudflare / Azure / GoDaddy** with guided credential prompts, **Manual** (one-off), and **"Other provider"** — which lists **win-acme's full ~20 in-box DNS plugins** (Route53, DNSMadeEasy, DigitalOcean, Linode, Hetzner, LuaDNS, NS1, RFC2136, TransIP, Aliyun, Tencent, …), downloads the chosen plugin, and **win-acme then prompts for that provider's credentials** (so we never hard-code per-provider argument names). Any provider with a win-acme plugin works directly; anything with no API uses **acme-dns**. The three guided sections below are just shortcuts; the pattern is identical for every provider.
+>
+> **Multiple domains:** when your sites span several registrable domains (e.g. `xphox.net`, `xphox.com`, `technicallabs.org`), `setup-iis.ps1` detects each one and asks whether a single provider/API key manages them all or each domain needs its own — so per-domain credentials are supported in one run.
 
 ## Section 1 — Azure DNS
 

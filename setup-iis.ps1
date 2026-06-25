@@ -295,27 +295,51 @@ function Invoke-Generate {
     }
 
     $email = Read-Host '   Contact email for the Let''s Encrypt account'
-    $sel = Get-DnsValidation
-    if (-not $sel) { Write-Host '   No provider chosen; aborting generation.' -ForegroundColor Yellow; return }
-    $val = $sel.Args
-    $interactive = $sel.Interactive
 
-    if ($sel.Plugin) {
-        Status 'FIX' 'DNS provider plugin' "installing $($sel.Label)..."
-        try { Install-WinAcmePlugin $sel.Plugin; Status 'OK' 'DNS provider plugin' 'installed' }
-        catch { Status 'FAIL' 'DNS provider plugin' $_.Exception.Message; return }
+    # DNS provider selection PER registrable domain - different domains (xphox.net vs xphox.com vs
+    # technicallabs.org) may live on different providers / use different API keys. Detect the distinct
+    # zones from the plan and ask once (one key for all) or per-domain.
+    $zones = @($Need | Select-Object -ExpandProperty Zone -Unique | Sort-Object)
+    $perDomain = $false
+    if ($zones.Count -gt 1) {
+        Write-Host ''
+        Write-Host ("  These certs span {0} DNS domains: {1}" -f $zones.Count, ($zones -join ', ')) -ForegroundColor White
+        $perDomain = (Read-Host '  Different DNS provider / API key per domain? (N = one provider+key manages them all) [y/N]') -match '^(y|yes)$'
     }
-    if ($sel.AcmeDns) {
+    $dnsByZone = @{}
+    if ($perDomain) {
+        foreach ($z in $zones) {
+            Write-Host ''
+            Write-Host ("  === DNS for $z ===") -ForegroundColor Cyan
+            $s = Get-DnsValidation
+            if (-not $s) { Write-Host "   No provider chosen for $z; aborting." -ForegroundColor Yellow; return }
+            $dnsByZone[$z] = $s
+        }
+    } else {
+        $s = Get-DnsValidation
+        if (-not $s) { Write-Host '   No provider chosen; aborting generation.' -ForegroundColor Yellow; return }
+        foreach ($z in $zones) { $dnsByZone[$z] = $s }
+    }
+
+    # Install each distinct provider plugin once.
+    $donePlugins = @{}
+    foreach ($z in $zones) {
+        $s = $dnsByZone[$z]
+        if ($s.Plugin -and -not $donePlugins.ContainsKey($s.Plugin)) {
+            $donePlugins[$s.Plugin] = $true
+            Status 'FIX' 'DNS provider plugin' "installing $($s.Label)..."
+            try { Install-WinAcmePlugin $s.Plugin; Status 'OK' 'DNS provider plugin' "installed ($($s.Label))" }
+            catch { Status 'FAIL' 'DNS provider plugin' $_.Exception.Message; return }
+        }
+    }
+    $anyManual = @($dnsByZone.Values | Where-Object { $_.Manual }).Count -gt 0
+    if (@($dnsByZone.Values | Where-Object { $_.AcmeDns }).Count) {
         Write-Host ''
-        Write-Host '   acme-dns: win-acme prompts for an acme-dns server, registers, and prints a one-time CNAME to' -ForegroundColor Yellow
-        Write-Host '   create at your registrar (Network Solutions, etc.). Once that CNAME exists, renewals are automatic.' -ForegroundColor Yellow
-    } elseif ($sel.Manual) {
+        Write-Host '   acme-dns: win-acme registers and prints a one-time CNAME to create at your registrar; then renewals are automatic.' -ForegroundColor Yellow
+    }
+    if ($anyManual) {
         Write-Host ''
-        Write-Host '   MANUAL DNS: win-acme prints a _acme-challenge TXT per cert; create it, wait ~1 min, follow the prompt.' -ForegroundColor Yellow
-        Write-Host '   NOTE: manual certs do NOT auto-renew. For hands-off 3rd-party DNS, use acme-dns instead.' -ForegroundColor Yellow
-    } elseif ($interactive) {
-        Write-Host ''
-        Write-Host ("   $($sel.Label): win-acme will prompt for this provider's credentials during issuance (and stores them for renewal).") -ForegroundColor Yellow
+        Write-Host '   MANUAL DNS selected for one or more domains: win-acme prints a TXT per cert; those certs do NOT auto-renew.' -ForegroundColor Yellow
     }
 
     # --- Optional PFX export (for other devices / non-IIS services) --------
@@ -361,9 +385,10 @@ function Invoke-Generate {
 
     # --- Staging-first toggle (recommended) --------------------------------
     Write-Host ''
-    # Interactive providers (acme-dns / manual / prompt-for-creds) skip the automated staging dry-run.
-    $stagingFirst = if ($interactive) {
-        Write-Host '  Interactive DNS: skipping the automated staging dry-run.' -ForegroundColor DarkGray
+    # Only automated (non-interactive) DNS methods can be dry-run unattended on staging.
+    $anyAuto = @($Need | Where-Object { -not $dnsByZone[$_.Zone].Interactive }).Count -gt 0
+    $stagingFirst = if (-not $anyAuto) {
+        Write-Host '  All selected DNS methods are interactive (acme-dns / manual / prompt) - skipping the automated staging dry-run.' -ForegroundColor DarkGray
         $false
     } else {
         (Read-Host "  Dry-run on Let's Encrypt STAGING first? (recommended - no rate-limit cost) [Y/n]") -notmatch '^(n|no)$'
@@ -373,11 +398,13 @@ function Invoke-Generate {
         Write-Host '  --- STAGING dry-run (validates DNS-01 end to end; issues + discards test certs) ---' -ForegroundColor Cyan
         $allOk = $true
         foreach ($p in $Need) {
+            $s = $dnsByZone[$p.Zone]
+            if ($s.Interactive) { Status 'OK' $p.Title "interactive DNS ($($s.Label)) - validates live during production"; continue }
             if (Test-StagingValidatedRecently $p.Base) {
                 Status 'OK' $p.Title 'staging validated in last 7 days - skipping (saves staging limits)'; continue
             }
             Status 'FIX' $p.Title 'testing on staging...'
-            if (Test-StagingCert -Wacs $wacs -Sans $p.Sans -Val $val -Email $email) {
+            if (Test-StagingCert -Wacs $wacs -Sans $p.Sans -Val $s.Args -Email $email) {
                 Status 'OK' $p.Title 'staging validated'; Set-StagingValidated $p.Base
             }
             else { Status 'FAIL' $p.Title 'staging failed (output above)'; $allOk = $false }
@@ -399,6 +426,7 @@ function Invoke-Generate {
         Write-Host '  Skipped production generation.' -ForegroundColor Yellow; return
     }
     foreach ($p in $Need) {
+        $s = $dnsByZone[$p.Zone]; $val = $s.Args; $interactive = $s.Interactive
         $hostArg = ($p.Sans -join ',')
         $gids = @($p.BindHosts | ForEach-Object { $SiteIdMap[$_] } | Select-Object -Unique)
         $primary = @($gids)[0]
@@ -417,9 +445,9 @@ function Invoke-Generate {
         if ($interactive) {
             # acme-dns / manual: interactive, do NOT capture output (win-acme prompts for the endpoint/
             # registration or the TXT record and reads your keypress). No transient-retry on this path.
-            if ($sel.AcmeDns) { Write-Host '  >>> acme-dns: follow win-acme''s prompts (it uses your one-time CNAME). <<<' -ForegroundColor Yellow }
-            elseif ($sel.Manual) { Write-Host '  >>> Manual: win-acme will show a TXT record; add it at your DNS, wait ~1 min, follow the prompt. <<<' -ForegroundColor Yellow }
-            else { Write-Host "  >>> $($sel.Label): enter the provider's credentials when win-acme prompts. <<<" -ForegroundColor Yellow }
+            if ($s.AcmeDns) { Write-Host '  >>> acme-dns: follow win-acme''s prompts (it uses your one-time CNAME). <<<' -ForegroundColor Yellow }
+            elseif ($s.Manual) { Write-Host '  >>> Manual: win-acme will show a TXT record; add it at your DNS, wait ~1 min, follow the prompt. <<<' -ForegroundColor Yellow }
+            else { Write-Host "  >>> $($s.Label): enter the provider's credentials when win-acme prompts. <<<" -ForegroundColor Yellow }
             & $wacs @a
             $ok = ($LASTEXITCODE -eq 0)
         } else {
@@ -458,9 +486,9 @@ function Invoke-Generate {
         }
     }
     Write-Host ''
-    if ($sel.Manual) {
-        Write-Host '  Done. NOTE: manual-DNS certs do NOT auto-renew (renewal needs a manual TXT record too).' -ForegroundColor Yellow
-        Write-Host '  Re-run before expiry, or use acme-dns (Runbook 02 Section A) for hands-off renewal.' -ForegroundColor Yellow
+    if ($anyManual) {
+        Write-Host '  Done. NOTE: certs issued via MANUAL DNS do NOT auto-renew (renewal needs a manual TXT). Others auto-renew + re-bind.' -ForegroundColor Yellow
+        Write-Host '  Re-run those before expiry, or use acme-dns / an API provider (Runbook 02 Section A) for hands-off renewal.' -ForegroundColor Yellow
     } else {
         Write-Host '  Done. win-acme created a renewal task per cert - it auto-renews AND re-binds IIS.' -ForegroundColor Green
     }
