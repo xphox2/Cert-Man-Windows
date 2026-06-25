@@ -2,6 +2,11 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.17] — 2026-06-24
+
+### Fixed
+- **Multi-site wildcards left partially bound.** `--installationsiteid` makes win-acme bind a wildcard only within **one** IIS site, so other sites hosting names under the same wildcard were left without HTTPS bindings — and the plan still showed the cert as "OK" because a cert existed. Added a **binding reconciliation pass**: `Get-MissingBindings` checks every covered host on every site for a missing/incorrect HTTPS binding, the plan now flags unbound hosts, and `Repair-Bindings` fixes them **locally (no certificate requests)**. Reconciliation runs both standalone (offered whenever unbound covered hosts are found, even if nothing needs issuing) and automatically after each production issuance, so a wildcard's hosts are fully bound across all sites.
+
 ## [0.1.16] — 2026-06-24
 
 ### Changed (CTO pass: minimize Let's Encrypt rate-limit burn during testing)

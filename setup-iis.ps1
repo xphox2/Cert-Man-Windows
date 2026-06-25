@@ -115,6 +115,49 @@ function Get-CertSource {
     return 'other CA'
 }
 
+function Get-MissingBindings {
+    # For every covered host, on every IIS site that hosts it, report where an HTTPS binding is
+    # missing or is using a different/old certificate than $Cert. (win-acme's --installationsiteid
+    # only binds ONE site, so multi-site wildcards can be left partially bound.)
+    param([string[]]$BindHosts, $Cert, [hashtable]$SiteIdMap, [hashtable]$SiteNameById)
+    $missing = @()
+    if (-not $Cert) { return $missing }
+    $tp = $Cert.Thumbprint.ToUpper()
+    foreach ($h in $BindHosts) {
+        foreach ($sid in @($SiteIdMap[$h])) {
+            $sname = $SiteNameById["$sid"]
+            if (-not $sname) { continue }
+            $b = Get-WebBinding -Name $sname -Protocol https -HostHeader $h -ErrorAction SilentlyContinue
+            if (-not $b) { $missing += [pscustomobject]@{ Host = $h; Site = $sname; State = 'no HTTPS binding' } }
+            elseif ($b.certificateHash -and ($b.certificateHash.ToUpper() -ne $tp)) {
+                $missing += [pscustomobject]@{ Host = $h; Site = $sname; State = 'bound to a different/old cert' }
+            }
+        }
+    }
+    return $missing
+}
+
+function Repair-Bindings {
+    # Create/fix the HTTPS bindings in $Missing so each points at $Cert (local only, no CA calls).
+    param([object[]]$Missing, $Cert)
+    if (-not $Cert -or -not $Missing) { return 0 }
+    $store = ($Cert.PSParentPath -split '\\')[-1]   # My or WebHosting
+    $fixed = 0
+    foreach ($m in $Missing) {
+        try {
+            $b = Get-WebBinding -Name $m.Site -Protocol https -HostHeader $m.Host -ErrorAction SilentlyContinue
+            if (-not $b) {
+                New-WebBinding -Name $m.Site -Protocol https -Port 443 -HostHeader $m.Host -SslFlags 1 -ErrorAction Stop
+                $b = Get-WebBinding -Name $m.Site -Protocol https -HostHeader $m.Host
+            }
+            $b.AddSslCertificate($Cert.Thumbprint, $store) | Out-Null
+            Write-Host ("      bound https://{0}  [site: {1}]" -f $m.Host, $m.Site) -ForegroundColor DarkGray
+            $fixed++
+        } catch { Write-Host ("      could not bind {0} on {1}: {2}" -f $m.Host, $m.Site, $_.Exception.Message) -ForegroundColor Yellow }
+    }
+    return $fixed
+}
+
 # --------------------------------------------- win-acme plugin install ------
 function Install-WinAcmePlugin {
     param([string]$Match)
@@ -285,22 +328,15 @@ function Invoke-Generate {
         }
         $cert = Find-NewestCovering $p.Sans
         $exp = if ($cert) { $cert.NotAfter.ToString('yyyy-MM-dd') } else { 'check store' }
-        Status 'OK' $p.Title ("issued + bound to IIS, expires {0}" -f $exp)
+        Status 'OK' $p.Title ("issued, expires {0}" -f $exp)
 
-        # If this wildcard's hosts span more than one IIS site, bind the extras too.
-        if ($gids.Count -gt 1 -and $cert) {
-            $storeOfCert = ($cert.PSParentPath -split '\\')[-1]
-            foreach ($h in $p.BindHosts) {
-                foreach ($sid in @($SiteIdMap[$h])) {
-                    if ($sid -eq $primary) { continue }
-                    $sname = $SiteNameById["$sid"]
-                    try {
-                        $bnd = Get-WebBinding -Name $sname -Protocol https -HostHeader $h -ErrorAction SilentlyContinue
-                        if (-not $bnd) { New-WebBinding -Name $sname -Protocol https -Port 443 -HostHeader $h -SslFlags 1 -ErrorAction Stop; $bnd = Get-WebBinding -Name $sname -Protocol https -HostHeader $h }
-                        $bnd.AddSslCertificate($cert.Thumbprint, $storeOfCert) | Out-Null
-                        Write-Host ("      also bound {0} on site {1}" -f $h, $sname) -ForegroundColor DarkGray
-                    } catch { Write-Host ("      could not bind {0} on {1}: {2}" -f $h, $sname, $_.Exception.Message) -ForegroundColor Yellow }
-                }
+        # win-acme's --installationsiteid binds only the primary site; reconcile EVERY covered host
+        # across ALL of its sites so multi-site wildcards are fully bound.
+        if ($cert) {
+            $miss = @(Get-MissingBindings -BindHosts $p.BindHosts -Cert $cert -SiteIdMap $SiteIdMap -SiteNameById $SiteNameById)
+            if ($miss.Count) {
+                Write-Host ("      binding {0} additional host(s)..." -f $miss.Count) -ForegroundColor DarkGray
+                Repair-Bindings -Missing $miss -Cert $cert | Out-Null
             }
         }
     }
@@ -390,16 +426,37 @@ foreach ($g in ($groups.Values | Sort-Object Base)) {
         $m = if ($hh.Role -eq 'apex') { '(apex)' } else { '      ' }
         Write-Host ("            - {0,-34} {1}  [{2}]" -f $hh.Host, $m, ($siteMap[$hh.Host] -join ', ')) -ForegroundColor Gray
     }
+
+    # Binding reconciliation: even when a cert exists, a covered host may be unbound (e.g. a wildcard
+    # spanning multiple IIS sites where only one site got bound). Detect it.
+    $bindHosts = @($g.Hosts | ForEach-Object { $_.Host })
+    $missing = @(Get-MissingBindings -BindHosts $bindHosts -Cert $cert -SiteIdMap $siteIdMap -SiteNameById $siteNameById)
+    if ($missing.Count) {
+        Write-Host ("          ! {0} covered host(s) are NOT bound to this cert (fixable, no cost):" -f $missing.Count) -ForegroundColor Yellow
+        foreach ($mm in $missing) { Write-Host ("              - {0}  [{1}]  ({2})" -f $mm.Host, $mm.Site, $mm.State) -ForegroundColor Yellow }
+    }
     $plan.Add([pscustomobject]@{ Index = $idx; Title = $title; Sans = $sans; Base = $g.Base; Zone = $g.Zone; Tag = $tag
-            BindHosts = @($g.Hosts | ForEach-Object { $_.Host }) })
+            BindHosts = $bindHosts; Cert = $cert; Missing = $missing })
 }
 
 # 6. Summary + offer live generation
 $need = @($plan | Where-Object Tag -in 'NEED', 'WARN')
+$missingTotal = @($plan | ForEach-Object { $_.Missing } | Where-Object { $_ })
 Write-Host ''
 Write-Host '  ==================================================' -ForegroundColor Cyan
-Write-Host ("   {0} certificate(s) cover {1} host name(s).  To generate/renew: {2}" -f $plan.Count, $uniqueHosts.Count, $need.Count) -ForegroundColor Cyan
+Write-Host ("   {0} certificate(s) cover {1} host name(s).  To generate/renew: {2}.  Unbound hosts: {3}" -f $plan.Count, $uniqueHosts.Count, $need.Count, $missingTotal.Count) -ForegroundColor Cyan
 Write-Host '  ==================================================' -ForegroundColor Cyan
+
+# 6a. Reconcile bindings for hosts that already have a valid cert but aren't bound (no CA cost).
+if ($missingTotal.Count) {
+    Write-Host ''
+    Status 'WARN' 'Binding check' ("{0} host(s) have a valid certificate but a missing/incorrect HTTPS binding" -f $missingTotal.Count)
+    if ((Read-Host '  Fix these HTTPS bindings now? (local only - no certificates requested) [Y/n]') -notmatch '^(n|no)$') {
+        $fixed = 0
+        foreach ($pp in $plan) { if ($pp.Cert -and $pp.Missing.Count) { $fixed += (Repair-Bindings -Missing $pp.Missing -Cert $pp.Cert) } }
+        Write-Host ("  Binding repair complete - {0} binding(s) added/updated." -f $fixed) -ForegroundColor Green
+    }
+}
 
 if ($need.Count -eq 0) {
     Write-Host ''
