@@ -103,7 +103,7 @@ flowchart TD
 |------|---------|
 | [00-Background-and-Concepts.md](00-Background-and-Concepts.md) | ACME/Let's Encrypt fundamentals, cert lifetime timeline, challenge types, rate limits, staging, ARI, wildcard rules. Read once. |
 | [01-Windows-IIS-HTTP01-Runbook.md](01-Windows-IIS-HTTP01-Runbook.md) | Public IIS sites — win-acme HTTP-01, fully unattended. |
-| [02-Windows-DNS01-Wildcard.md](02-Windows-DNS01-Wildcard.md) | Internal IIS + wildcard — win-acme DNS-01 (Azure / Cloudflare / GoDaddy, on-prem CNAME delegation). |
+| [02-Windows-DNS01-Wildcard.md](02-Windows-DNS01-Wildcard.md) | Internal IIS + wildcard — win-acme DNS-01. **acme-dns** for any registrar (incl. Network Solutions); Cloudflare / Azure / GoDaddy + win-acme's full ~20-provider list. |
 | [03-Windows-NonIIS-Services.md](03-Windows-NonIIS-Services.md) | RDP, SQL Server, Exchange, custom HTTP.SYS — post-renewal binding scripts. |
 | [04-Azure-WebApp-Certs.md](04-Azure-WebApp-Certs.md) | **Azure Web App certs** — decide first: free managed cert for a single hostname, or our Let's Encrypt path (05) for wildcard/export/multi-service. |
 | [05-Azure-PoshACME-Runbook.md](05-Azure-PoshACME-Runbook.md) | **Azure Let's Encrypt** — our Posh-ACME Azure Automation runbook (wildcard/export). No third-party app. |

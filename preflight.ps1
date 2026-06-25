@@ -127,6 +127,52 @@ function Get-Checks {
     $checks
 }
 
+# ---------------------------------------------------- DNS provider menu ----
+function Get-WinAcmeDnsProviders {
+    # The full list of in-box win-acme DNS plugins, derived live from the latest release.
+    try {
+        @((Get-WinAcmeRelease).assets.name |
+            Where-Object { $_ -match 'plugin\.validation\.dns\.' } |
+            ForEach-Object { ($_ -replace 'plugin\.validation\.dns\.', '' -replace '\.v[0-9].*', '') } |
+            Sort-Object -Unique)
+    } catch {
+        @('aliyun', 'azure', 'cloudflare', 'digitalocean', 'dnsmadeeasy', 'godaddy', 'googledns', 'hetzner',
+            'linode', 'luadns', 'ns1', 'rfc2136', 'route53', 'simply', 'tencent', 'transip')
+    }
+}
+function Get-DnsValidation {
+    # Returns @{ Args; Plugin; Interactive; Label; AcmeDns } for the chosen DNS method, or $null.
+    Write-Host ''
+    Write-Host '   DNS for the _acme-challenge record:' -ForegroundColor White
+    Write-Host '     1) acme-dns       - ANY registrar incl. no-API (Network Solutions); one-time CNAME, then auto-renews' -ForegroundColor White
+    Write-Host '     2) Cloudflare' -ForegroundColor White
+    Write-Host '     3) Azure DNS' -ForegroundColor White
+    Write-Host '     4) GoDaddy' -ForegroundColor White
+    Write-Host "     5) Other provider - choose from win-acme's full DNS list" -ForegroundColor White
+    Write-Host '     6) Manual         - one-off; does NOT auto-renew' -ForegroundColor White
+    switch (Read-Host '   Choose 1-6') {
+        '1' { return @{ Args = @('--validation', 'acme-dns'); Plugin = $null; Interactive = $true; Label = 'acme-dns'; AcmeDns = $true } }
+        '2' { $t = Read-Host '   Cloudflare API token'; return @{ Args = @('--validation', 'cloudflare', '--cloudflareapitoken', $t); Plugin = 'plugin.validation.dns.cloudflare'; Interactive = $false; Label = 'Cloudflare' } }
+        '3' { $tn = Read-Host '   Azure Tenant ID'; $ci = Read-Host '   Azure Client (App) ID'; $sc = Read-Host '   Azure Client Secret'; $su = Read-Host '   Azure Subscription ID'; $rg = Read-Host '   Azure DNS Resource Group'
+            return @{ Args = @('--validation', 'azure', '--azuretenantid', $tn, '--azureclientid', $ci, '--azuresecret', $sc, '--azuresubscriptionid', $su, '--azureresourcegroupname', $rg); Plugin = 'plugin.validation.dns.azure'; Interactive = $false; Label = 'Azure DNS' } }
+        '4' { $k = Read-Host '   GoDaddy API key'; $s = Read-Host '   GoDaddy API secret'; return @{ Args = @('--validation', 'godaddy', '--apikey', $k, '--apisecret', $s); Plugin = 'plugin.validation.dns.godaddy'; Interactive = $false; Label = 'GoDaddy' } }
+        '5' {
+            $providers = Get-WinAcmeDnsProviders
+            Write-Host ''
+            for ($i = 0; $i -lt $providers.Count; $i++) { Write-Host ('     {0,2}) {1}' -f ($i + 1), $providers[$i]) -ForegroundColor Gray }
+            $idx = ([int](Read-Host '   Provider number')) - 1
+            if ($idx -lt 0 -or $idx -ge $providers.Count) { Write-Host '   Invalid choice.' -ForegroundColor Yellow; return $null }
+            $key = $providers[$idx]
+            Write-Host ("   Arguments reference: https://www.win-acme.com/reference/plugins/validation/dns/{0}" -f $key) -ForegroundColor DarkGray
+            $raw = Read-Host ("   Enter win-acme arguments for {0} (e.g. --xxxapikey VALUE)" -f $key)
+            $extra = if ($raw) { @($raw -split '\s+' | Where-Object { $_ }) } else { @() }
+            return @{ Args = @('--validation', $key) + $extra; Plugin = "plugin.validation.dns.$key"; Interactive = $false; Label = $key }
+        }
+        '6' { return @{ Args = @('--validation', 'manual'); Plugin = $null; Interactive = $true; Label = 'Manual' } }
+        default { return $null }
+    }
+}
+
 # ---------------------------------------------------- DNS-01 staging test --
 function Invoke-DnsTest {
     $wacs = Join-Path $WinAcmePath 'wacs.exe'
@@ -135,61 +181,62 @@ function Invoke-DnsTest {
     $testHost = Read-Host '   Wildcard/host to validate (e.g. *.example.com), or ENTER to skip'
     if (-not $testHost) { return }
     $email = Read-Host '   Contact email for the Let''s Encrypt account'
-    Write-Host ''
-    Write-Host '   DNS provider:   1) Cloudflare    2) Azure DNS    3) GoDaddy' -ForegroundColor White
-    $choice = Read-Host '   Choose 1-3'
-    $val = switch ($choice) {
-        '1' { $t = Read-Host '   Cloudflare API token'; @('--validation', 'cloudflare', '--cloudflareapitoken', $t) }
-        '2' {
-            $tn = Read-Host '   Azure Tenant ID';    $ci = Read-Host '   Azure Client (App) ID'
-            $sc = Read-Host '   Azure Client Secret'; $su = Read-Host '   Azure Subscription ID'
-            $rg = Read-Host '   Azure DNS Resource Group'
-            @('--validation', 'azure', '--azuretenantid', $tn, '--azureclientid', $ci, '--azuresecret', $sc,
-              '--azuresubscriptionid', $su, '--azureresourcegroupname', $rg)
-        }
-        '3' { $k = Read-Host '   GoDaddy API key'; $s = Read-Host '   GoDaddy API secret'; @('--validation', 'godaddy', '--apikey', $k, '--apisecret', $s) }
-        default { $null }
-    }
-    if (-not $val) { Write-Host '   Skipped.' -ForegroundColor Yellow; return }
+    $sel = Get-DnsValidation
+    if (-not $sel) { Write-Host '   Skipped.' -ForegroundColor Yellow; return }
 
-    # The DNS provider plugin is a SEPARATE download from the base win-acme build - install it on demand.
-    $pluginMatch = switch ($choice) {
-        '1' { 'plugin.validation.dns.cloudflare' }
-        '2' { 'plugin.validation.dns.azure' }
-        '3' { 'plugin.validation.dns.godaddy' }
+    if ($sel.Plugin) {
+        Write-Host ''
+        Status 'FIX' $sel.Label 'installing DNS provider plugin...'
+        try { Install-WinAcmePlugin $sel.Plugin; Status 'OK' 'DNS provider plugin' 'installed' }
+        catch { Status 'FAIL' 'DNS provider plugin' $_.Exception.Message; return }
     }
-    Write-Host ''
-    Status 'FIX' "$pluginMatch" 'installing DNS provider plugin...'
-    try { Install-WinAcmePlugin $pluginMatch; Status 'OK' 'DNS provider plugin' 'installed' }
-    catch { Status 'FAIL' 'DNS provider plugin' $_.Exception.Message; return }
+    if ($sel.AcmeDns) {
+        Write-Host ''
+        Write-Host '   acme-dns is interactive: win-acme will ask you to pick an acme-dns server, then REGISTER and' -ForegroundColor Yellow
+        Write-Host '   print a CNAME to create at your registrar (e.g. Network Solutions). First run = register + show' -ForegroundColor Yellow
+        Write-Host '   the CNAME; create it, wait ~1 min, then re-run this test to confirm validation succeeds.' -ForegroundColor Yellow
+    }
 
     $tmp = Join-Path $env:TEMP ('pf-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
     $fn = "PREFLIGHT $testHost"; $pw = [guid]::NewGuid().ToString('N')
     $log = Join-Path $WinAcmePath 'preflight-dns-test.log'
-    Write-Host ''
-    Write-Host '   Running a staging issuance (writes + removes a TXT record)...' -ForegroundColor Cyan
-    $a = @('--baseuri', $StagingUri, '--source', 'manual', '--host', $testHost) + $val +
+    $a = @('--baseuri', $StagingUri, '--source', 'manual', '--host', $testHost) + $sel.Args +
          @('--store', 'pfxfile', '--pfxfilepath', $tmp, '--pfxpassword', $pw, '--installation', 'none',
            '--emailaddress', $email, '--accepttos', '--friendlyname', $fn, '--closeonfinish', '--verbose')
+
+    Write-Host ''
+    Write-Host "   Running a STAGING issuance to validate DNS-01 via $($sel.Label)..." -ForegroundColor Cyan
     $out = $null
-    try { $out = & $wacs @a 2>&1 } catch { $out = $_.Exception.Message }
-    $out | Out-File -FilePath $log -Encoding utf8
-    $ok = ($LASTEXITCODE -eq 0) -and (Get-ChildItem $tmp -Filter *.pfx -ErrorAction SilentlyContinue)
+    if ($sel.Interactive) {
+        # acme-dns / manual must be interactive (win-acme prompts for the endpoint/registration or the TXT).
+        & $wacs @a
+        $ok = ($LASTEXITCODE -eq 0) -and (Get-ChildItem $tmp -Filter *.pfx -ErrorAction SilentlyContinue)
+    } else {
+        try { $out = & $wacs @a 2>&1 } catch { $out = $_.Exception.Message }
+        $out | Out-File -FilePath $log -Encoding utf8
+        $ok = ($LASTEXITCODE -eq 0) -and (Get-ChildItem $tmp -Filter *.pfx -ErrorAction SilentlyContinue)
+    }
     try { & $wacs --baseuri $StagingUri --cancel --friendlyname $fn --closeonfinish 2>&1 | Out-Null } catch {}
     Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
 
     Write-Host ''
     if ($ok) {
-        Status 'OK' 'DNS-01 validation' "staging cert issued for $testHost - your DNS automation works!"
+        Status 'OK' 'DNS-01 validation' "staging cert issued for $testHost via $($sel.Label) - your DNS automation works!"
     } else {
-        Status 'FAIL' 'DNS-01 validation' 'staging issuance did not complete'
-        Write-Host '   --- win-acme output (last 25 lines) ------------------------' -ForegroundColor DarkYellow
-        @($out) | Select-Object -Last 25 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkGray }
-        Write-Host '   ------------------------------------------------------------' -ForegroundColor DarkYellow
-        Write-Host "   Full output saved to: $log" -ForegroundColor Yellow
-        Write-Host '   Common causes: wrong API token, token lacks DNS-edit on this zone,' -ForegroundColor Yellow
-        Write-Host '   or the zone is hosted by a different provider than selected.' -ForegroundColor Yellow
+        Status 'FAIL' 'DNS-01 validation' "staging issuance did not complete ($($sel.Label))"
+        if ($out) {
+            Write-Host '   --- win-acme output (last 25 lines) ------------------------' -ForegroundColor DarkYellow
+            @($out) | Select-Object -Last 25 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkGray }
+            Write-Host "   Full output saved to: $log" -ForegroundColor Yellow
+        } else {
+            Write-Host '   See the win-acme output above (and C:\ProgramData\win-acme logs).' -ForegroundColor Yellow
+        }
+        if ($sel.AcmeDns) {
+            Write-Host '   acme-dns: if it printed a CNAME, create it at your registrar, wait ~1 min, then re-run this test.' -ForegroundColor Yellow
+        } else {
+            Write-Host '   Common causes: wrong credentials, the key lacks DNS-edit on this zone, or the wrong provider.' -ForegroundColor Yellow
+        }
     }
 }
 

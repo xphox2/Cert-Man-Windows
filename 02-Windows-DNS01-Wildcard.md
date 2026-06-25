@@ -72,20 +72,32 @@ flowchart TD
 
 ---
 
-## Section A — CNAME delegation for on-prem / API-less DNS
+## Section A — Any DNS via acme-dns (incl. Network Solutions & registrars with no API)
 
-If the host lives on internal AD DNS (or any DNS without an automatable API), **don't expose it**. Delegate only the challenge record to an API-capable zone:
+If the domain's DNS has **no automatable API** — **Network Solutions / the old MyDomain.com**, many registrars, internal AD DNS — you don't write TXT records there at all. You **delegate just the `_acme-challenge` record** to a tiny API-capable target and let the client update *that*. Your real DNS only ever holds **one static CNAME**, set once.
 
-1. Stand up (or reuse) an API-capable zone, e.g. `acme.example.com` in **Cloudflare** or **Azure DNS** — or deploy [acme-dns](https://github.com/joohoi/acme-dns) for a purpose-built, tightly scoped target.
-2. In the host's **real** zone, add a **permanent** CNAME (one per host needing a cert):
+The purpose-built tool is **[acme-dns](https://github.com/acme-dns/acme-dns)** — a minimal DNS server whose only job is `_acme-challenge` TXT records. Both win-acme and Posh-ACME support it.
+
+### How it works (one-time CNAME, then automatic)
+1. The ACME client registers once with an acme-dns server → it hands back a random subdomain like `a1b2c3d4.auth.example.com`.
+2. **At your registrar (e.g. Network Solutions), add ONE static CNAME** (every registrar can do this):
    ```
-   _acme-challenge.app.example.com.   CNAME   app.acme.example.com.
+   _acme-challenge.app.example.com.   CNAME   a1b2c3d4.auth.example.com.
    ```
-   For a wildcard, delegate the apex challenge:
-   ```
-   _acme-challenge.example.com.       CNAME   example.acme.example.com.
-   ```
-3. Configure the win-acme DNS plugin for the **delegated** provider/zone (`acme.example.com`). win-acme writes the TXT in the delegated zone; the CA follows the CNAME.
+   One CNAME per **registrable domain** covers both the wildcard and the apex (same challenge name). Set it once; never touch it again.
+3. Forever after, the client writes the TXT into **acme-dns** (via its locked-down API) — never your registrar. Let's Encrypt follows the CNAME and validates. **Auto-renews.**
+
+Security: the acme-dns credential can *only* set a throwaway `_acme-challenge` TXT — even if it leaks, your real DNS is untouched.
+
+### Running acme-dns
+- **Self-host (recommended for production):** a single Go binary. Run it on a small host, make it authoritative for a subdomain (delegate `auth.example.com` → the acme-dns host's IP via NS records), reachable on **:53 (UDP/TCP)** + **:80/:443** for its API. As an MSP/NOC you run **one** acme-dns and every customer CNAMEs to it.
+- **Public test server:** `https://auth.acme-dns.io` for quick validation; self-host for production.
+
+### Wiring it up with our scripts
+- **Preflight** → DNS test → choose **acme-dns**. win-acme prompts for the acme-dns server, registers, and prints the CNAME to create. Add it at your registrar, wait ~1 min, re-run the test to confirm validation.
+- **Issuance** (`setup-iis.ps1`) → choose **acme-dns** in the provider menu; it issues and binds, and renewals are automatic because the CNAME is permanent.
+
+> **Plain CNAME delegation to a supported provider** is the same idea without acme-dns: point `_acme-challenge.host` at a zone you *do* have an API for (Cloudflare/Azure DNS). Use it only if you already run such a zone — otherwise acme-dns is cleaner, since it needs no other provider.
 
 ```mermaid
 flowchart LR
@@ -107,6 +119,8 @@ flowchart LR
 The rest of this runbook then proceeds exactly as for a normal API-hosted zone.
 
 ---
+
+> **Provider coverage:** the scripts' DNS menu offers **acme-dns** (above), **Cloudflare / Azure / GoDaddy** with guided prompts, **Manual** (one-off), and **"Other provider"** — which lists **win-acme's full ~20 in-box DNS plugins** (Route53, DNSMadeEasy, DigitalOcean, Linode, Hetzner, LuaDNS, NS1, RFC2136, deSEC/TransIP, Aliyun, Tencent, …) and lets you enter that plugin's arguments. So any provider with a win-acme plugin works directly; anything else uses **acme-dns**. The sections below cover the three guided providers; the pattern is identical for the others.
 
 ## Section 1 — Azure DNS
 

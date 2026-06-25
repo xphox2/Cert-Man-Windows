@@ -2,6 +2,16 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.22] — 2026-06-25
+
+### Added (DNS provider coverage — works with any registrar)
+- **acme-dns option** in `preflight.ps1` and `setup-iis.ps1`. The universal, auto-renewing answer for registrars with **no usable API** (e.g. **Network Solutions / MyDomain.com**): win-acme's built-in `--validation acme-dns` (interactive registration, one-time `_acme-challenge` CNAME, then automatic). The preflight DNS test validates it end-to-end against staging.
+- **"Other provider"** option that lists **win-acme's full ~20 in-box DNS plugins** (fetched live from the release — Route53, DNSMadeEasy, DigitalOcean, Linode, Hetzner, LuaDNS, NS1, RFC2136, TransIP, Aliyun, Tencent, …), auto-downloads the chosen plugin, and accepts its arguments. No longer limited to 3 providers.
+- Shared `Get-DnsValidation` selector in both scripts (acme-dns / Cloudflare / Azure / GoDaddy / Other / Manual); interactive paths (acme-dns, Manual) run win-acme un-captured so its prompts are visible.
+
+### Changed
+- Runbook 02 **§A rewritten** as an **acme-dns** section (Network Solutions example, one-time CNAME, self-host vs public `auth.acme-dns.io`, MSP "one server, all customers CNAME to it" model). Provider-coverage note added; README updated. Sourced from [acme-dns](https://github.com/acme-dns/acme-dns) and [win-acme acme-dns docs](https://www.win-acme.com/reference/plugins/validation/dns/acme-dns).
+
 ## [0.1.21] — 2026-06-25
 
 ### Changed (drop the third-party Acmebot dependency — build it ourselves)
