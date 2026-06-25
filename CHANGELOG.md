@@ -2,6 +2,14 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.12] — 2026-06-24
+
+### Added
+- **`setup-iis.ps1` staging-first toggle.** Before any production issuance, it offers a **Let's Encrypt STAGING dry-run** that validates DNS-01 end-to-end for each planned cert (issues + discards a test cert, no rate-limit cost, nothing bound). If any staging test fails, **production is not touched** and it tells you why; only when all pass does it ask to proceed to production.
+
+### Changed
+- Production issuance now uses `--installation iis` so win-acme **binds the covered hosts and re-binds them on every future renewal** (the previous one-time manual binding wouldn't survive a renewal). The provider/token is collected once and reused for both staging and production.
+
 ## [0.1.11] — 2026-06-24
 
 ### Changed

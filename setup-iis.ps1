@@ -15,6 +15,7 @@
 $Url         = 'https://xphox2.github.io/Cert-Man-Windows/setup-iis.ps1'
 $WinAcmePath = 'C:\win-acme'
 $ProdUri     = 'https://acme-v02.api.letsencrypt.org/directory'
+$StagingUri  = 'https://acme-staging-v02.api.letsencrypt.org/directory'
 
 # ----------------------------------------------------------------- helpers --
 function Test-AdminNow {
@@ -124,16 +125,37 @@ function Install-WinAcmePlugin {
 }
 
 # --------------------------------------------- generation -------------------
+function Test-StagingCert {
+    # Dry-run one cert against Let's Encrypt STAGING: proves DNS-01 works for this exact
+    # SAN set without touching production rate limits or binding anything. Returns $true/$false.
+    param([string]$Wacs, [string[]]$Sans, [string[]]$Val, [string]$Email)
+    $hostArg = $Sans -join ','
+    $tmp = Join-Path $env:TEMP ('cmw-stg-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory $tmp -Force | Out-Null
+    $fn = "[CertMan-STAGING] $hostArg"
+    $log = Join-Path $WinAcmePath ("staging-{0}.log" -f ($hostArg -replace '[^a-z0-9]', '_'))
+    $a = @('--baseuri', $StagingUri, '--source', 'manual', '--host', $hostArg) + $Val +
+         @('--store', 'pfxfile', '--pfxfilepath', $tmp, '--pfxpassword', [guid]::NewGuid().ToString('N'),
+           '--installation', 'none', '--emailaddress', $Email, '--accepttos', '--friendlyname', $fn, '--closeonfinish', '--verbose')
+    $out = $null
+    try { $out = & $Wacs @a 2>&1 } catch { $out = $_.Exception.Message }
+    $out | Out-File -FilePath $log -Encoding utf8
+    $ok = ($LASTEXITCODE -eq 0) -and (Get-ChildItem $tmp -Filter *.pfx -ErrorAction SilentlyContinue)
+    try { & $Wacs --baseuri $StagingUri --cancel --friendlyname $fn --closeonfinish 2>&1 | Out-Null } catch {}
+    Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    if (-not $ok) {
+        @($out) | Select-Object -Last 18 | ForEach-Object { Write-Host "         $_" -ForegroundColor DarkGray }
+        Write-Host "         Full log: $log" -ForegroundColor Yellow
+    }
+    return [bool]$ok
+}
+
 function Invoke-Generate {
-    param([object[]]$Need, [hashtable]$SiteMap)
+    param([object[]]$Need)
     $wacs = Join-Path $WinAcmePath 'wacs.exe'
 
     Write-Host ''
-    Write-Host '  >>> LIVE generation on the PRODUCTION Let''s Encrypt server. <<<' -ForegroundColor Yellow
-    Write-Host '      Real, trusted certificates count against rate limits (50/domain/week).' -ForegroundColor DarkGray
-    $confirm = Read-Host ("  Generate {0} certificate(s) now? [y/N]" -f $Need.Count)
-    if ($confirm -notmatch '^(y|yes)$') { Write-Host '  Skipped generation.' -ForegroundColor Yellow; return }
-
+    Write-Host ("  Generate {0} certificate(s) for the items marked NEED/WARN above." -f $Need.Count) -ForegroundColor White
     $email = Read-Host '   Contact email for the Let''s Encrypt account'
     Write-Host ''
     Write-Host '   DNS provider:   1) Cloudflare    2) Azure DNS    3) GoDaddy' -ForegroundColor White
@@ -155,13 +177,43 @@ function Invoke-Generate {
     try { Install-WinAcmePlugin $pluginMatch; Status 'OK' 'DNS provider plugin' 'installed' }
     catch { Status 'FAIL' 'DNS provider plugin' $_.Exception.Message; return }
 
+    # --- Staging-first toggle (recommended) --------------------------------
+    Write-Host ''
+    $stagingFirst = (Read-Host "  Dry-run on Let's Encrypt STAGING first? (recommended - no rate-limit cost) [Y/n]") -notmatch '^(n|no)$'
+    if ($stagingFirst) {
+        Write-Host ''
+        Write-Host '  --- STAGING dry-run (validates DNS-01 end to end; issues + discards test certs) ---' -ForegroundColor Cyan
+        $allOk = $true
+        foreach ($p in $Need) {
+            Status 'FIX' $p.Title 'testing on staging...'
+            if (Test-StagingCert -Wacs $wacs -Sans $p.Sans -Val $val -Email $email) { Status 'OK' $p.Title 'staging validated' }
+            else { Status 'FAIL' $p.Title 'staging failed (output above)'; $allOk = $false }
+        }
+        if (-not $allOk) {
+            Write-Host ''
+            Write-Host '  One or more staging tests FAILED. Production was NOT touched.' -ForegroundColor Red
+            Write-Host '  Fix the cause (usually DNS token scope or wrong provider), then re-run.' -ForegroundColor Yellow
+            return
+        }
+        Write-Host ''
+        Write-Host '  All staging tests passed.' -ForegroundColor Green
+    }
+
+    # --- Production issuance + IIS binding ----------------------------------
+    Write-Host ''
+    Write-Host '  >>> PRODUCTION: live, trusted certificates (count against rate limits, 50/domain/week). <<<' -ForegroundColor Yellow
+    if ((Read-Host ("  Generate {0} certificate(s) on PRODUCTION now? [y/N]" -f $Need.Count)) -notmatch '^(y|yes)$') {
+        Write-Host '  Skipped production generation.' -ForegroundColor Yellow; return
+    }
     foreach ($p in $Need) {
         $hostArg = ($p.Sans -join ',')
         Write-Host ''
         Write-Host ("  === Generating: {0} ===" -f $p.Title) -ForegroundColor Cyan
         $log = Join-Path $WinAcmePath ("issue-{0}.log" -f ($p.Base -replace '[^a-z0-9]', '_'))
+        # --installation iis lets win-acme bind the covered hosts AND re-bind on every renewal.
         $a = @('--baseuri', $ProdUri, '--source', 'manual', '--host', $hostArg) + $val +
-             @('--store', 'certificatestore', '--installation', 'none', '--emailaddress', $email, '--accepttos', '--friendlyname', "[CertMan] $($p.Title)", '--closeonfinish', '--verbose')
+             @('--store', 'certificatestore', '--installation', 'iis', '--emailaddress', $email,
+               '--accepttos', '--friendlyname', "[CertMan] $($p.Title)", '--closeonfinish', '--verbose')
         $out = $null
         try { $out = & $wacs @a 2>&1 } catch { $out = $_.Exception.Message }
         $out | Out-File -FilePath $log -Encoding utf8
@@ -173,27 +225,10 @@ function Invoke-Generate {
             Write-Host "      Full log: $log" -ForegroundColor Yellow
             continue
         }
-        Status 'OK' $p.Title ("issued, expires {0}" -f $cert.NotAfter.ToString('yyyy-MM-dd'))
-
-        # Bind to each covered host's site(s)
-        foreach ($h in $p.BindHosts) {
-            foreach ($site in $SiteMap[$h]) {
-                try {
-                    $b = Get-WebBinding -Name $site -Protocol https -HostHeader $h -ErrorAction SilentlyContinue
-                    if (-not $b) {
-                        New-WebBinding -Name $site -Protocol https -Port 443 -HostHeader $h -SslFlags 1 -ErrorAction Stop
-                        $b = Get-WebBinding -Name $site -Protocol https -HostHeader $h
-                    }
-                    $b.AddSslCertificate($cert.Thumbprint, 'My') | Out-Null
-                    Write-Host ("      bound https://{0}  [site: {1}]" -f $h, $site) -ForegroundColor DarkGray
-                } catch {
-                    Write-Host ("      could not bind {0} on {1}: {2}" -f $h, $site, $_.Exception.Message) -ForegroundColor Yellow
-                }
-            }
-        }
+        Status 'OK' $p.Title ("issued + bound to IIS, expires {0}" -f $cert.NotAfter.ToString('yyyy-MM-dd'))
     }
     Write-Host ''
-    Write-Host '  Generation complete. win-acme created a renewal task for each cert (auto-renews).' -ForegroundColor Green
+    Write-Host '  Done. win-acme created a renewal task per cert - it auto-renews AND re-binds IIS.' -ForegroundColor Green
 }
 
 # ----------------------------------------------------------------- main -----
@@ -292,7 +327,7 @@ if ($need.Count -eq 0) {
     Write-Host '  Run the preflight first to install win-acme, then re-run this script to generate:' -ForegroundColor Yellow
     Write-Host '    irm https://xphox2.github.io/Cert-Man-Windows/preflight.ps1 | iex' -ForegroundColor Gray
 } else {
-    Invoke-Generate -Need $need -SiteMap $siteMap
+    Invoke-Generate -Need $need
 }
 Write-Host ''
 Write-Host '   https://github.com/xphox2/Cert-Man-Windows  (Runbook 02 = wildcard issuance)' -ForegroundColor DarkGray
