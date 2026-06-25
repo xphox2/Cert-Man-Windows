@@ -2,6 +2,11 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.14] — 2026-06-24
+
+### Fixed
+- **`setup-iis.ps1` production issuance aborted with `missing --installationsiteid`.** For a wildcard with `--source manual`, win-acme's IIS installation plugin **requires** `--installationsiteid`; without it, win-acme aborts during plugin setup **before** ordering (so no cert is issued and no rate limit is consumed). The script now captures each IIS site's **id** during the scan, passes `--installationsiteid <id>` for the site hosting each wildcard's bindings, and — if a wildcard's hosts span multiple sites — binds the extra sites explicitly via `New-WebBinding`/`AddSslCertificate`.
+
 ## [0.1.13] — 2026-06-24
 
 ### Fixed

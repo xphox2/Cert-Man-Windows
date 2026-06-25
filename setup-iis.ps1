@@ -169,7 +169,7 @@ function Test-StagingCert {
 }
 
 function Invoke-Generate {
-    param([object[]]$Need)
+    param([object[]]$Need, [hashtable]$SiteIdMap, [hashtable]$SiteNameById)
     $wacs = Join-Path $WinAcmePath 'wacs.exe'
 
     Write-Host ''
@@ -225,13 +225,16 @@ function Invoke-Generate {
     }
     foreach ($p in $Need) {
         $hostArg = ($p.Sans -join ',')
+        $gids = @($p.BindHosts | ForEach-Object { $SiteIdMap[$_] } | Select-Object -Unique)
+        $primary = @($gids)[0]
         Write-Host ''
-        Write-Host ("  === Generating: {0} ===" -f $p.Title) -ForegroundColor Cyan
+        Write-Host ("  === Generating: {0}  (IIS site id {1}) ===" -f $p.Title, $primary) -ForegroundColor Cyan
         $log = Join-Path $WinAcmePath ("issue-{0}.log" -f ($p.Base -replace '[^a-z0-9]', '_'))
-        # --installation iis lets win-acme bind the covered hosts AND re-bind on every renewal.
+        # Wildcard + manual source REQUIRES --installationsiteid. win-acme then binds the covered
+        # hosts in that site AND re-binds them on every renewal.
         $a = @('--baseuri', $ProdUri, '--source', 'manual', '--host', $hostArg) + $val +
-             @('--store', 'certificatestore', '--installation', 'iis', '--emailaddress', $email,
-               '--accepttos', '--friendlyname', "[CertMan] $($p.Title)", '--closeonfinish', '--verbose')
+             @('--store', 'certificatestore', '--installation', 'iis', '--installationsiteid', "$primary",
+               '--emailaddress', $email, '--accepttos', '--friendlyname', "[CertMan] $($p.Title)", '--closeonfinish', '--verbose')
         $r = Invoke-WacsRetry -Wacs $wacs -WacsArgs $a -IsSuccess { $LASTEXITCODE -eq 0 }
         $out = $r.Out
         $out | Out-File -FilePath $log -Encoding utf8
@@ -243,7 +246,23 @@ function Invoke-Generate {
             Write-Host "      Full log: $log" -ForegroundColor Yellow
             continue
         }
-        Status 'OK' $p.Title ("issued + bound to IIS, expires {0}" -f $cert.NotAfter.ToString('yyyy-MM-dd'))
+        Status 'OK' $p.Title ("issued + bound, expires {0}" -f $cert.NotAfter.ToString('yyyy-MM-dd'))
+
+        # If this wildcard's hosts span more than one IIS site, bind the extras too.
+        if ($gids.Count -gt 1) {
+            foreach ($h in $p.BindHosts) {
+                foreach ($sid in @($SiteIdMap[$h])) {
+                    if ($sid -eq $primary) { continue }
+                    $sname = $SiteNameById["$sid"]
+                    try {
+                        $bnd = Get-WebBinding -Name $sname -Protocol https -HostHeader $h -ErrorAction SilentlyContinue
+                        if (-not $bnd) { New-WebBinding -Name $sname -Protocol https -Port 443 -HostHeader $h -SslFlags 1 -ErrorAction Stop; $bnd = Get-WebBinding -Name $sname -Protocol https -HostHeader $h }
+                        $bnd.AddSslCertificate($cert.Thumbprint, 'My') | Out-Null
+                        Write-Host ("      also bound {0} on site {1}" -f $h, $sname) -ForegroundColor DarkGray
+                    } catch { Write-Host ("      could not bind {0} on {1}: {2}" -f $h, $sname, $_.Exception.Message) -ForegroundColor Yellow }
+                }
+            }
+        }
     }
     Write-Host ''
     Write-Host '  Done. win-acme created a renewal task per cert - it auto-renews AND re-binds IIS.' -ForegroundColor Green
@@ -278,13 +297,15 @@ Write-Host ''
 
 # 3. Scan IIS bindings
 $bindings = New-Object System.Collections.Generic.List[object]; $noHost = 0
+$siteNameById = @{}
 foreach ($site in Get-Website) {
+    $siteNameById["$($site.id)"] = $site.Name
     foreach ($b in $site.bindings.Collection) {
         if ($b.protocol -notin 'http', 'https') { continue }
         $parts = $b.bindingInformation -split ':'
         $h = if ($parts.Count -ge 3) { $parts[2] } else { '' }
         if ([string]::IsNullOrWhiteSpace($h)) { $noHost++; continue }
-        $bindings.Add([pscustomobject]@{ Host = $h.ToLower(); Site = $site.Name })
+        $bindings.Add([pscustomobject]@{ Host = $h.ToLower(); Site = $site.Name; SiteId = "$($site.id)" })
     }
 }
 $uniqueHosts = @($bindings | Select-Object -Expand Host -Unique)
@@ -292,8 +313,11 @@ Write-Host ("  Scanned {0} site(s); {1} unique host name(s) across {2} binding(s
 if ($noHost) { Write-Host ("  ({0} binding(s) had no host header - skipped.)" -f $noHost) -ForegroundColor DarkGray }
 if ($uniqueHosts.Count -eq 0) { Write-Host '  No host-named bindings. Add host headers to your sites first.' -ForegroundColor Yellow; return }
 
-$siteMap = @{}
-foreach ($h in $uniqueHosts) { $siteMap[$h] = @($bindings | Where-Object Host -eq $h | Select-Object -Expand Site -Unique) }
+$siteMap = @{}; $siteIdMap = @{}
+foreach ($h in $uniqueHosts) {
+    $siteMap[$h] = @($bindings | Where-Object Host -eq $h | Select-Object -Expand Site -Unique)
+    $siteIdMap[$h] = @($bindings | Where-Object Host -eq $h | Select-Object -Expand SiteId -Unique)
+}
 
 # 4. Group into wildcard certs
 $groups = @{}
@@ -345,7 +369,7 @@ if ($need.Count -eq 0) {
     Write-Host '  Run the preflight first to install win-acme, then re-run this script to generate:' -ForegroundColor Yellow
     Write-Host '    irm https://xphox2.github.io/Cert-Man-Windows/preflight.ps1 | iex' -ForegroundColor Gray
 } else {
-    Invoke-Generate -Need $need
+    Invoke-Generate -Need $need -SiteIdMap $siteIdMap -SiteNameById $siteNameById
 }
 Write-Host ''
 Write-Host '   https://github.com/xphox2/Cert-Man-Windows  (Runbook 02 = wildcard issuance)' -ForegroundColor DarkGray
