@@ -74,9 +74,9 @@ Run the bootstrap script (downloads the latest release, extracts to `C:\win-acme
 & "E:\NOC\SSL_Rotation_Windows\scripts\Install-WinAcme.ps1" -InstallPath "C:\win-acme" -NotifyEmail "ops@example.com"
 ```
 
-> Prefer to do it by hand? Download the **`win-acme...x64.trimmed.zip`** from the [releases page](https://github.com/win-acme/win-acme/releases), extract to `C:\win-acme`, then unblock:
+> Prefer to do it by hand? Download the **`win-acme...x64.pluggable.zip`** from the [releases page](https://github.com/win-acme/win-acme/releases) (use **pluggable**, not trimmed — the trimmed build can't load the DNS validation plugins that wildcard/DNS-01 issuance needs), extract to `C:\win-acme`, then unblock:
 > ```powershell
-> Get-ChildItem C:\win-acme\*.dll | Unblock-File
+> Get-ChildItem C:\win-acme\*.dll, C:\win-acme\*.exe | Unblock-File
 > ```
 
 The script and the `settings.json` reference are documented in [03](03-Windows-NonIIS-Services.md#appendix-settingsjson-reference); the only field that matters now is the ACME directory URL, which we point at **staging** for Step 2.
@@ -164,10 +164,10 @@ Defaults (configurable in `settings.json` → `ScheduledTask`): runs **daily ~09
 ## Step 5 — Verify the live binding
 
 ```powershell
-# The cert is in LocalMachine\My and bound to the HTTPS binding
-Get-ChildItem Cert:\LocalMachine\My |
+# Find the cert. win-acme's IIS installation stores it in the WebHosting store (not My), so check both.
+Get-ChildItem Cert:\LocalMachine\My, Cert:\LocalMachine\WebHosting |
   Where-Object Subject -like "*www.example.com*" |
-  Select-Object Subject, NotAfter, Thumbprint
+  Select-Object Subject, NotAfter, Thumbprint, PSParentPath
 
 # Confirm what's actually served on the wire
 $h='www.example.com'

@@ -111,7 +111,8 @@ foreach ($m in @((Get-IisRefs), (Get-HttpSysRefs), (Get-RdpRef))) {
 
 # --- Build the report -------------------------------------------------------
 $now = Get-Date
-$rows = foreach ($c in (Get-ChildItem Cert:\LocalMachine\My)) {
+# Scan both stores: manually-imported certs live in My; win-acme's IIS-installed certs live in WebHosting.
+$rows = foreach ($c in (Get-ChildItem Cert:\LocalMachine\My, Cert:\LocalMachine\WebHosting)) {
     $days = [int][math]::Floor(($c.NotAfter - $now).TotalDays)
     if ($PSBoundParameters.ContainsKey('ExpiringInDays') -and $days -gt $ExpiringInDays) { continue }
     $tp = $c.Thumbprint.ToUpper()
@@ -119,6 +120,7 @@ $rows = foreach ($c in (Get-ChildItem Cert:\LocalMachine\My)) {
     [PSCustomObject]@{
         Subject      = $cn
         Source       = Get-SourceLabel $c
+        Store        = ($c.PSParentPath -split '\\')[-1]
         NotAfter     = $c.NotAfter.ToString('yyyy-MM-dd')
         DaysLeft     = $days
         Thumbprint   = $tp
@@ -126,7 +128,7 @@ $rows = foreach ($c in (Get-ChildItem Cert:\LocalMachine\My)) {
     }
 }
 
-$rows | Sort-Object DaysLeft | Format-Table Subject, Source, NotAfter, DaysLeft, ReferencedBy, Thumbprint -AutoSize -Wrap | Out-String | Write-Host
+$rows | Sort-Object DaysLeft | Format-Table Subject, Source, Store, NotAfter, DaysLeft, ReferencedBy, Thumbprint -AutoSize -Wrap | Out-String | Write-Host
 
 $bound = $rows | Where-Object { $_.ReferencedBy -ne '(unused)' }
 Write-Host ("Certificates: {0} total, {1} actively bound." -f $rows.Count, $bound.Count) -ForegroundColor Cyan

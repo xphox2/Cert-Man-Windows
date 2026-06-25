@@ -82,21 +82,22 @@ Record, per host/site: current cert **subject**, **issuer** (the vendor), **expi
 
 ## Step 2 — Issue and bind Let's Encrypt (no downtime)
 
-Run the normal issuance from Runbook 01 or 02. With win-acme `--source iis`, issuance **installs the new cert and switches the site's HTTPS binding to it in one atomic step** — the new cert is in the store *before* the binding flips, so there is no meaningful downtime and no window where the site is certless.
+Run the normal issuance from Runbook 01 (HTTP-01) or 02 (DNS-01 / wildcard). win-acme installs the new cert and switches the site's HTTPS binding to it in one step — the cert is in the store *before* the binding flips, so there is no meaningful downtime and no certless window, and it re-binds automatically on renewal.
 
-**Wildcard takeover example** (your scenario — replace a vendor wildcard, DNS-01, binds to the IIS site):
+**Wildcard takeover example** (replace a vendor wildcard, DNS-01, bind to IIS). Wildcards must use `--source manual`, which **requires `--installationsiteid`** for win-acme to bind into IIS:
 
 ```powershell
 cd C:\win-acme
-.\wacs.exe --source iis --siteid 1 `
-  --host "*.example.com,example.com" `
+.\wacs.exe --source manual --host "*.example.com,example.com" `
   --validation cloudflare --cloudflareapitoken "<scoped-token>" `
   --store certificatestore `
-  --installation iis `
+  --installation iis --installationsiteid 1 `
   --emailaddress ops@example.com --accepttos --closeonfinish --verbose
 ```
 
-Repeat per domain/site for your three wildcards (or run once per site id). See [02](02-Windows-DNS01-Wildcard.md) for the Azure DNS / GoDaddy variants and the on-prem CNAME-delegation pattern.
+Repeat per domain/site for your wildcards — or just run the **IIS script** (`irm https://xphox2.github.io/Cert-Man-Windows/setup-iis.ps1 | iex`), which plans, generates, and binds **all** covered sites (across multiple IIS sites) for you. See [02](02-Windows-DNS01-Wildcard.md) for the Azure DNS / GoDaddy / Manual variants and the on-prem CNAME-delegation pattern.
+
+> **Where the cert lands:** with `--installation iis`, win-acme stores the cert in the **`WebHosting`** store (not `My`). Check both stores when verifying: `Get-ChildItem Cert:\LocalMachine\My, Cert:\LocalMachine\WebHosting`.
 
 ### Belt-and-suspenders (staged) variant
 
@@ -109,16 +110,18 @@ Want to verify the LE cert exists *before* touching the live binding? Issue to t
   --store certificatestore --installation none `
   --emailaddress ops@example.com --accepttos --closeonfinish
 
-# 2) Confirm the new cert is present (note its thumbprint)
-Get-ChildItem Cert:\LocalMachine\My | Where-Object Subject -like "*example.com*" |
-  Select-Object Subject, Issuer, NotAfter, Thumbprint
+# 2) Confirm the new cert is present (note its thumbprint). Check both stores.
+Get-ChildItem Cert:\LocalMachine\My, Cert:\LocalMachine\WebHosting |
+  Where-Object Subject -like "*example.com*" |
+  Select-Object Subject, Issuer, NotAfter, Thumbprint, PSParentPath
 
-# 3) Switch the IIS binding to the new thumbprint (replaces the old cert on that binding)
+# 3) Switch the IIS binding to the new cert (replaces the old cert on that binding)
 Import-Module WebAdministration
-$new = (Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.Subject -like "*example.com*" -and $_.Issuer -like "*Let's Encrypt*" } | Sort-Object NotAfter -Desc | Select-Object -First 1)
-Get-WebBinding -Name "MySite" -Protocol https | ForEach-Object {
-    $_.AddSslCertificate($new.Thumbprint, "My")
-}
+$new = Get-ChildItem Cert:\LocalMachine\My, Cert:\LocalMachine\WebHosting |
+  Where-Object { $_.Subject -like "*example.com*" -and $_.Issuer -like "*Let's Encrypt*" } |
+  Sort-Object NotAfter -Descending | Select-Object -First 1
+$store = ($new.PSParentPath -split '\\')[-1]   # My or WebHosting
+Get-WebBinding -Name "MySite" -Protocol https | ForEach-Object { $_.AddSslCertificate($new.Thumbprint, $store) }
 ```
 
 > The staged variant leaves win-acme renewal driven by the `manual` renewal it created; for IIS it's usually simpler to let `--source iis --installation iis` own the rebind so renewals re-bind automatically.

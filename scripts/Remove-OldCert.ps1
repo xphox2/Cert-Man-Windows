@@ -77,9 +77,11 @@ function Get-References {
     return $hits
 }
 
-$cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.Thumbprint.ToUpper() -eq $tp }
-if (-not $cert) { throw "No certificate with thumbprint $tp found in LocalMachine\My." }
+$cert = Get-ChildItem Cert:\LocalMachine\My, Cert:\LocalMachine\WebHosting | Where-Object { $_.Thumbprint.ToUpper() -eq $tp } | Select-Object -First 1
+if (-not $cert) { throw "No certificate with thumbprint $tp found in LocalMachine\My or WebHosting." }
+$certStore = ($cert.PSParentPath -split '\\')[-1]   # My or WebHosting
 Write-Host "Target: $($cert.Subject)" -ForegroundColor Cyan
+Write-Host "  Store  : $certStore"
 Write-Host "  Issuer : $($cert.Issuer)"
 Write-Host "  Expires: $($cert.NotAfter)"
 
@@ -113,15 +115,15 @@ if ($BackupPath) {
     }
 }
 
-# --- Remove ----------------------------------------------------------------
-$leaf = "Cert:\LocalMachine\My\$tp"
+# --- Remove (from the store the cert actually lives in) --------------------
+$leaf = "Cert:\LocalMachine\$certStore\$tp"
 if ($DeleteKey) {
-    $store = New-Object System.Security.Cryptography.X509Certificates.X509Store('My', 'LocalMachine')
+    $store = New-Object System.Security.Cryptography.X509Certificates.X509Store($certStore, 'LocalMachine')
     $store.Open('ReadWrite'); $store.Remove($cert); $store.Close()
-    Write-Host "Removed certificate and key for $tp." -ForegroundColor Green
+    Write-Host "Removed certificate and key for $tp from $certStore." -ForegroundColor Green
 } else {
     Remove-Item -Path $leaf -Force
-    Write-Host "Removed certificate $tp (private key left in place)." -ForegroundColor Green
+    Write-Host "Removed certificate $tp from $certStore (private key left in place)." -ForegroundColor Green
 }
 
 Write-Host "Done. Verify the site still serves the Let's Encrypt cert (Check-CertExpiry.ps1)." -ForegroundColor Yellow

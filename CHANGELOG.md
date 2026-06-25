@@ -2,6 +2,14 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.19] — 2026-06-24
+
+### Documentation accuracy pass (sync docs/flows with the validated implementation)
+- **Runbook 01:** the manual download note now says **pluggable** (not trimmed) build, and Step 5 verification checks **both `My` and `WebHosting`** stores (win-acme's IIS install lands in `WebHosting`).
+- **Runbook 02:** corrected the claim that the preflight "installs IIS" — the preflight is **ACME + DNS only**; the IIS role + wildcard generation is the `setup-iis.ps1` step. Added the Manual provider to the prompt list.
+- **Runbook 08:** the wildcard takeover command now uses the proven `--source manual --host "*.x" --installation iis --installationsiteid <id>` pattern (not `--source iis` with a wildcard), added a `WebHosting`-store note, and the staged variant now finds/binds the cert from whichever store it's in. Points to `setup-iis.ps1` for multi-site binding.
+- **`scripts/Inventory-Certs.ps1` / `Remove-OldCert.ps1`:** now scan **both `My` and `WebHosting`** (and report/operate on the cert's actual store) so IIS-installed certs aren't invisible to inventory/removal.
+
 ## [0.1.18] — 2026-06-24
 
 ### Added
