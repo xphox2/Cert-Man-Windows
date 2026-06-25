@@ -1,0 +1,34 @@
+# acme-dns config example. Copy to config/config.cfg and edit the marked values.
+# Full reference + hardening: Runbook 09 (09-AcmeDNS-Server-Setup.md).
+
+[general]
+listen   = "0.0.0.0:53"          # public DNS listener (NOT 127.0.0.1 on a real server)
+protocol = "both"                 # udp + tcp
+domain   = "auth.example.com"     # <-- the subdomain you delegate to this server
+nsname   = "auth.example.com"     # <-- same as domain
+nsadmin  = "admin.example.com"    # <-- SOA contact (admin@example.com)
+records  = [                      # <-- the server answers these for its own zone
+    "auth.example.com. A 198.51.100.10",     # <-- public IP of THIS host (glue)
+    "auth.example.com. NS auth.example.com.",
+]
+debug = false
+
+[database]
+engine     = "sqlite3"
+connection = "/var/lib/acme-dns/acme-dns.db"
+
+[api]
+ip                   = "0.0.0.0"
+port                 = "443"
+tls                  = "letsencrypt"   # acme-dns gets its own LE cert for the API (needs :80 + :443)
+notification_email   = "admin@example.com"
+acme_cache_dir       = "api-certs"
+disable_registration = false           # set true AFTER you've registered all accounts
+corsorigins          = ["*"]
+use_header           = false           # true only if behind a reverse proxy
+header_name          = "X-Forwarded-For"
+
+[logconfig]
+loglevel  = "info"
+logtype   = "stdout"
+logformat = "text"

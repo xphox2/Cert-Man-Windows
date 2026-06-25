@@ -1,0 +1,17 @@
+# acme-dns one-command deploy (compose alternative to scripts/Deploy-AcmeDns.ps1).
+# 1) cp config.cfg.example config/config.cfg  and edit it (domain, public IP, nsadmin).
+# 2) docker compose up -d
+# Ports: 53/tcp+udp (DNS), 80 + 443 (HTTP API + its own Let's Encrypt cert). See Runbook 09.
+services:
+  acme-dns:
+    image: joohoi/acme-dns
+    container_name: acme-dns
+    restart: unless-stopped
+    ports:
+      - "53:53"
+      - "53:53/udp"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config:/etc/acme-dns:ro
+      - ./data:/var/lib/acme-dns

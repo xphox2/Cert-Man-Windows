@@ -2,6 +2,12 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.24] — 2026-06-25
+
+### Added
+- **`scripts/Deploy-AcmeDns.ps1`** — one-command acme-dns server deploy: generates `config.cfg` from parameters, runs the official container with the correct ports (53/udp+tcp, 80, 443) and persistent volumes, verifies it's up, and prints the exact DNS delegation records (NS + glue A) to add. Cross-platform (Docker; Windows PowerShell or `pwsh` on Linux); `-ApiTls none` for a quick HTTP-only test.
+- **`acme-dns/docker-compose.yml` + `config.cfg.example`** — declarative alternative for compose users. Runbook 09 Step 3 now leads with the script, then compose, then plain Docker. README scripts list updated.
+
 ## [0.1.23] — 2026-06-25
 
 ### Added

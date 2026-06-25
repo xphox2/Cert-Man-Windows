@@ -94,7 +94,19 @@ Replace `<public-ip>` and the `xphox.net` names with yours.
 
 ## Step 3 — Run it
 
-### Docker (simplest)
+### One command (recommended): `Deploy-AcmeDns.ps1`
+Generates `config.cfg` from parameters, runs the container with the right ports/volumes, verifies, and prints the exact delegation records to add. Needs Docker; runs under Windows PowerShell or `pwsh` on Linux.
+
+```powershell
+& "E:\NOC\SSL_Rotation_Windows\scripts\Deploy-AcmeDns.ps1" `
+    -Domain auth.xphox.net -PublicIP 198.51.100.10 -NotificationEmail admin@xphox.net
+```
+(Steps 1 & 2 are done for you — it writes the config and starts the server. For a quick HTTP-only test, add `-ApiTls none`.)
+
+### Or docker-compose
+The [`acme-dns/`](acme-dns/) folder has a `docker-compose.yml` + `config.cfg.example`: copy the example to `config/config.cfg`, edit it (Step 2), then `docker compose up -d`.
+
+### Or plain Docker
 ```bash
 docker run -d --name acme-dns --restart unless-stopped \
   -p 53:53 -p 53:53/udp -p 80:80 -p 443:443 \
