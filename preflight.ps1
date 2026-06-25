@@ -163,12 +163,10 @@ function Get-DnsValidation {
             $idx = ([int](Read-Host '   Provider number')) - 1
             if ($idx -lt 0 -or $idx -ge $providers.Count) { Write-Host '   Invalid choice.' -ForegroundColor Yellow; return $null }
             $key = $providers[$idx]
-            Write-Host ("   Arguments reference: https://www.win-acme.com/reference/plugins/validation/dns/{0}" -f $key) -ForegroundColor DarkGray
-            $raw = Read-Host ("   Enter win-acme arguments for {0} (e.g. --xxxapikey VALUE)" -f $key)
-            $extra = if ($raw) { @($raw -split '\s+' | Where-Object { $_ }) } else { @() }
-            return @{ Args = @('--validation', $key) + $extra; Plugin = "plugin.validation.dns.$key"; Interactive = $false; Label = $key }
+            Write-Host ("   win-acme will prompt for {0}'s credentials (ref: https://www.win-acme.com/reference/plugins/validation/dns/{0})." -f $key) -ForegroundColor DarkGray
+            return @{ Args = @('--validation', $key); Plugin = "plugin.validation.dns.$key"; Interactive = $true; Label = $key }
         }
-        '6' { return @{ Args = @('--validation', 'manual'); Plugin = $null; Interactive = $true; Label = 'Manual' } }
+        '6' { return @{ Args = @('--validation', 'manual'); Plugin = $null; Interactive = $true; Label = 'Manual'; Manual = $true } }
         default { return $null }
     }
 }

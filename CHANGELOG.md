@@ -2,6 +2,13 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.25] — 2026-06-25
+
+### Fixed (support every DNS option, no per-provider guessing)
+- **"Other provider" now lets win-acme prompt for credentials** instead of asking you to hand-type each plugin's argument names (which the scripts would have been guessing). It downloads the chosen plugin and runs `--validation <plugin>` interactively, so **all ~20 win-acme DNS plugins work** without us hard-coding any provider's argument names. These certs still auto-renew (win-acme stores the credentials).
+- Verified the guided providers against win-acme docs: **Azure** (`--azuresecret`, `--azuretenantid`, `--azureclientid`, `--azuresubscriptionid`, `--azureresourcegroupname`) and **GoDaddy** (`--apikey`, `--apisecret`) are correct; Cloudflare was already confirmed by live test.
+- Renewal/auto-renew messaging in `setup-iis.ps1` now distinguishes **Manual** (no auto-renew) from acme-dns / generic-plugin providers (which do auto-renew) — previously any interactive provider was mislabeled "manual".
+
 ## [0.1.24] — 2026-06-25
 
 ### Added

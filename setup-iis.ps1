@@ -203,12 +203,10 @@ function Get-DnsValidation {
             $idx = ([int](Read-Host '   Provider number')) - 1
             if ($idx -lt 0 -or $idx -ge $providers.Count) { Write-Host '   Invalid choice.' -ForegroundColor Yellow; return $null }
             $key = $providers[$idx]
-            Write-Host ("   Arguments reference: https://www.win-acme.com/reference/plugins/validation/dns/{0}" -f $key) -ForegroundColor DarkGray
-            $raw = Read-Host ("   Enter win-acme arguments for {0} (e.g. --xxxapikey VALUE)" -f $key)
-            $extra = if ($raw) { @($raw -split '\s+' | Where-Object { $_ }) } else { @() }
-            return @{ Args = @('--validation', $key) + $extra; Plugin = "plugin.validation.dns.$key"; Interactive = $false; Label = $key }
+            Write-Host ("   win-acme will prompt for {0}'s credentials (ref: https://www.win-acme.com/reference/plugins/validation/dns/{0})." -f $key) -ForegroundColor DarkGray
+            return @{ Args = @('--validation', $key); Plugin = "plugin.validation.dns.$key"; Interactive = $true; Label = $key }
         }
-        '6' { return @{ Args = @('--validation', 'manual'); Plugin = $null; Interactive = $true; Label = 'Manual' } }
+        '6' { return @{ Args = @('--validation', 'manual'); Plugin = $null; Interactive = $true; Label = 'Manual'; Manual = $true } }
         default { return $null }
     }
 }
@@ -307,17 +305,20 @@ function Invoke-Generate {
         Write-Host ''
         Write-Host '   acme-dns: win-acme prompts for an acme-dns server, registers, and prints a one-time CNAME to' -ForegroundColor Yellow
         Write-Host '   create at your registrar (Network Solutions, etc.). Once that CNAME exists, renewals are automatic.' -ForegroundColor Yellow
-    } elseif ($interactive) {
+    } elseif ($sel.Manual) {
         Write-Host ''
         Write-Host '   MANUAL DNS: win-acme prints a _acme-challenge TXT per cert; create it, wait ~1 min, follow the prompt.' -ForegroundColor Yellow
         Write-Host '   NOTE: manual certs do NOT auto-renew. For hands-off 3rd-party DNS, use acme-dns instead.' -ForegroundColor Yellow
+    } elseif ($interactive) {
+        Write-Host ''
+        Write-Host ("   $($sel.Label): win-acme will prompt for this provider's credentials during issuance (and stores them for renewal).") -ForegroundColor Yellow
     }
 
     # --- Staging-first toggle (recommended) --------------------------------
     Write-Host ''
-    # Manual DNS would force you to create TXT records twice (staging + prod), so skip staging for it.
+    # Interactive providers (acme-dns / manual / prompt-for-creds) skip the automated staging dry-run.
     $stagingFirst = if ($interactive) {
-        Write-Host '  Interactive DNS (acme-dns / manual): skipping the automated staging dry-run.' -ForegroundColor DarkGray
+        Write-Host '  Interactive DNS: skipping the automated staging dry-run.' -ForegroundColor DarkGray
         $false
     } else {
         (Read-Host "  Dry-run on Let's Encrypt STAGING first? (recommended - no rate-limit cost) [Y/n]") -notmatch '^(n|no)$'
@@ -368,7 +369,8 @@ function Invoke-Generate {
             # acme-dns / manual: interactive, do NOT capture output (win-acme prompts for the endpoint/
             # registration or the TXT record and reads your keypress). No transient-retry on this path.
             if ($sel.AcmeDns) { Write-Host '  >>> acme-dns: follow win-acme''s prompts (it uses your one-time CNAME). <<<' -ForegroundColor Yellow }
-            else { Write-Host '  >>> Manual: win-acme will show a TXT record; add it at your DNS, wait ~1 min, follow the prompt. <<<' -ForegroundColor Yellow }
+            elseif ($sel.Manual) { Write-Host '  >>> Manual: win-acme will show a TXT record; add it at your DNS, wait ~1 min, follow the prompt. <<<' -ForegroundColor Yellow }
+            else { Write-Host "  >>> $($sel.Label): enter the provider's credentials when win-acme prompts. <<<" -ForegroundColor Yellow }
             & $wacs @a
             $ok = ($LASTEXITCODE -eq 0)
         } else {
@@ -403,7 +405,7 @@ function Invoke-Generate {
         }
     }
     Write-Host ''
-    if ($interactive -and -not $sel.AcmeDns) {
+    if ($sel.Manual) {
         Write-Host '  Done. NOTE: manual-DNS certs do NOT auto-renew (renewal needs a manual TXT record too).' -ForegroundColor Yellow
         Write-Host '  Re-run before expiry, or use acme-dns (Runbook 02 Section A) for hands-off renewal.' -ForegroundColor Yellow
     } else {
