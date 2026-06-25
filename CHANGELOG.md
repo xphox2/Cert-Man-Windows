@@ -2,6 +2,13 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.16] — 2026-06-24
+
+### Changed (CTO pass: minimize Let's Encrypt rate-limit burn during testing)
+- **Staging validation memory.** After a base passes the staging dry-run, a 7-day marker is written under `C:\win-acme\.cmw-cache`; subsequent runs **skip re-testing** that base on staging, so iterative runs don't keep burning staging limits.
+- **Rate-limit budget panel + free-review gate.** Before anything is requested (or credentials entered), the script now shows the new certificates it would request **grouped by registered domain**, restates the Let's Encrypt limits (50/domain/week, 5 duplicate/week, 5 failed-validations/hour), and requires an explicit `Proceed to generate? [y/N]` — reviewing the plan now costs nothing.
+- Reinforced existing protections in comments: only `NEED`/`WARN` certs are issued (already-valid certs in `My`/`WebHosting` are skipped), and `--force` is never used so win-acme reuses its 24h cache (re-running within a day requests nothing new).
+
 ## [0.1.15] — 2026-06-24
 
 ### Fixed

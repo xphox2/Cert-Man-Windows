@@ -146,6 +146,22 @@ function Invoke-WacsRetry {
     return [pscustomobject]@{ Ok = $ok; Out = $out }
 }
 
+function Get-CmwCacheDir { $d = Join-Path $WinAcmePath '.cmw-cache'; New-Item -ItemType Directory -Path $d -Force | Out-Null; $d }
+function Test-StagingValidatedRecently {
+    # Did we already pass a STAGING dry-run for this base in the last N days? If so, skip
+    # re-testing to avoid burning staging rate limits on iterative runs.
+    param([string]$Base, [int]$Days = 7)
+    $f = Join-Path (Get-CmwCacheDir) ("staging-ok-{0}.txt" -f ($Base -replace '[^a-z0-9]', '_'))
+    if (-not (Test-Path $f)) { return $false }
+    try { $t = [datetime]::FromBinary([long]((Get-Content $f -Raw).Trim())); return ((Get-Date) - $t).TotalDays -lt $Days }
+    catch { return $false }
+}
+function Set-StagingValidated {
+    param([string]$Base)
+    $f = Join-Path (Get-CmwCacheDir) ("staging-ok-{0}.txt" -f ($Base -replace '[^a-z0-9]', '_'))
+    (Get-Date).ToBinary().ToString() | Set-Content -Path $f -Encoding ascii
+}
+
 function Test-StagingCert {
     # Dry-run one cert against Let's Encrypt STAGING: proves DNS-01 works for this exact
     # SAN set without touching production rate limits or binding anything. Returns $true/$false.
@@ -175,8 +191,21 @@ function Invoke-Generate {
     param([object[]]$Need, [hashtable]$SiteIdMap, [hashtable]$SiteNameById)
     $wacs = Join-Path $WinAcmePath 'wacs.exe'
 
+    # --- Rate-limit budget: show what this run would request BEFORE asking for anything ----
     Write-Host ''
-    Write-Host ("  Generate {0} certificate(s) for the items marked NEED/WARN above." -f $Need.Count) -ForegroundColor White
+    Write-Host '  Rate-limit budget for this run (new certificates to request, by registered domain):' -ForegroundColor White
+    $byDomain = @{}
+    foreach ($p in $Need) { $rd = Get-RegistrableDomain $p.Base; $byDomain[$rd] = 1 + ([int]$byDomain[$rd]) }
+    foreach ($rd in ($byDomain.Keys | Sort-Object)) {
+        Status ($(if ($byDomain[$rd] -gt 5) { 'WARN' } else { 'OK' })) $rd ("{0} new certificate(s) this run" -f $byDomain[$rd])
+    }
+    Write-Host "   Let's Encrypt limits: 50 certs/registered-domain/week, 5 duplicate (identical names)/week, 5 failed validations/hour." -ForegroundColor DarkGray
+    Write-Host '   Already-valid certs were skipped above. win-acme reuses its 24h cache, so re-running within a day requests nothing new.' -ForegroundColor DarkGray
+    Write-Host ''
+    if ((Read-Host '  Proceed to generate? (reviewing the plan above costs nothing) [y/N]') -notmatch '^(y|yes)$') {
+        Write-Host '  Plan only - nothing was requested from Let''s Encrypt.' -ForegroundColor Yellow; return
+    }
+
     $email = Read-Host '   Contact email for the Let''s Encrypt account'
     Write-Host ''
     Write-Host '   DNS provider:   1) Cloudflare    2) Azure DNS    3) GoDaddy' -ForegroundColor White
@@ -206,8 +235,13 @@ function Invoke-Generate {
         Write-Host '  --- STAGING dry-run (validates DNS-01 end to end; issues + discards test certs) ---' -ForegroundColor Cyan
         $allOk = $true
         foreach ($p in $Need) {
+            if (Test-StagingValidatedRecently $p.Base) {
+                Status 'OK' $p.Title 'staging validated in last 7 days - skipping (saves staging limits)'; continue
+            }
             Status 'FIX' $p.Title 'testing on staging...'
-            if (Test-StagingCert -Wacs $wacs -Sans $p.Sans -Val $val -Email $email) { Status 'OK' $p.Title 'staging validated' }
+            if (Test-StagingCert -Wacs $wacs -Sans $p.Sans -Val $val -Email $email) {
+                Status 'OK' $p.Title 'staging validated'; Set-StagingValidated $p.Base
+            }
             else { Status 'FAIL' $p.Title 'staging failed (output above)'; $allOk = $false }
         }
         if (-not $allOk) {
