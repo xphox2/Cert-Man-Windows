@@ -113,7 +113,7 @@ flowchart TD
 | [09-AcmeDNS-Server-Setup.md](09-AcmeDNS-Server-Setup.md) | **acme-dns server** — stand up one server so any registrar with no API (Network Solutions, etc.) auto-renews via a one-time CNAME. MSP model. |
 | [preflight.ps1](preflight.ps1) | **Preflight** (ACME + DNS) — validate + auto-install win-acme, optional DNS-01 staging test. `irm .../preflight.ps1 \| iex` |
 | [setup-iis.ps1](setup-iis.ps1) | **IIS certificate setup** — validate IIS, scan sites, plan wildcard certs (collapsing shared parents), then generate + bind on live Let's Encrypt. `irm .../setup-iis.ps1 \| iex` |
-| [scripts/](scripts/) | Ready-to-run PowerShell: win-acme install, deploy-to-service, monitoring, Posh-ACME renewal, cert inventory + safe removal (migration), scriptable preflight, **acme-dns server deploy**. |
+| [scripts/](scripts/) | Ready-to-run PowerShell: win-acme install, deploy-to-service, monitoring, Posh-ACME renewal, cert inventory + safe removal (migration), scriptable preflight, **no-API-registrar issuance via DNS alias** (`Issue-DnsAlias.ps1`), acme-dns server deploy. |
 | [acme-dns/](acme-dns/) | `docker-compose.yml` + `config.cfg.example` to stand up an acme-dns server (see [Runbook 09](09-AcmeDNS-Server-Setup.md)). |
 | [docs/diagrams/](docs/diagrams/) | All flow diagrams (Mermaid source + SVG/PNG exports) for training and slides. |
 | [docs/training-deck/](docs/training-deck/) | Print-ready [training deck PDF](docs/training-deck/SSL-Cert-Rotation-Training-Deck.pdf) — every diagram in order, one per slide. |

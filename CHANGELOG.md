@@ -2,6 +2,12 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.27] — 2026-06-25
+
+### Added (Windows/PowerShell-native path for no-API registrars)
+- **`scripts/Issue-DnsAlias.ps1`** — issue a Let's Encrypt cert for a domain whose registrar has **no DNS API** (Network Solutions, etc.) using **Posh-ACME DNS challenge aliases**. You delegate `_acme-challenge` (one CNAME) to a delegation zone you control; Posh-ACME writes the TXT there via that provider's plugin. **No acme-dns server, no Linux, no Docker** — pure Windows PowerShell. Provider-agnostic (Cloudflare / Azure / Route53 / any Posh-ACME plugin, chosen at runtime), staging-first by default, prints the exact one-time CNAME, and optionally registers an unattended renewal task.
+- Runbook 02 §A rewritten to lead with this (delegate-to-a-zone-you-control = recommended Windows/PowerShell path) and reposition **acme-dns as the alternative** (a dedicated, Linux-only server). Clarifies that `auth.acme-dns.io` is a public test instance, not production-safe.
+
 ## [0.1.26] — 2026-06-25
 
 ### Fixed

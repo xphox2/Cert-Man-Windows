@@ -72,11 +72,33 @@ flowchart TD
 
 ---
 
-## Section A — Any DNS via acme-dns (incl. Network Solutions & registrars with no API)
+## Section A — Any DNS with no API (Network Solutions & registrars without an API)
 
-If the domain's DNS has **no automatable API** — **Network Solutions / the old MyDomain.com**, many registrars, internal AD DNS — you don't write TXT records there at all. You **delegate just the `_acme-challenge` record** to a tiny API-capable target and let the client update *that*. Your real DNS only ever holds **one static CNAME**, set once.
+If the domain's DNS has **no automatable API** — **Network Solutions / the old MyDomain.com**, many registrars, internal AD DNS — nothing can write the `_acme-challenge` TXT *there* automatically. That's how DNS-01 works, not a tool limit. The fix is always the same: add **one static CNAME** at the registrar that redirects `_acme-challenge` to a **delegation target you control that *does* have an API**. The CA follows the CNAME; the registrar is never touched again.
 
-The purpose-built tool is **[acme-dns](https://github.com/acme-dns/acme-dns)** — a minimal DNS server whose only job is `_acme-challenge` TXT records. Both win-acme and Posh-ACME support it.
+You choose the delegation target — and that choice decides the tooling:
+
+| Delegation target | Server to run? | Tool | Windows/PowerShell native? |
+|---|---|---|---|
+| **A DNS zone you control** (Azure DNS, Cloudflare, Route53, your own BIND/PowerDNS) | none — a zone you already control | **Posh-ACME `-DnsAlias`** | ✅ **recommended** |
+| **acme-dns** (dedicated server) | yes — and the server is **Linux-only** (no Windows binary) | win-acme `acme-dns` plugin | ❌ server isn't |
+
+> `https://auth.acme-dns.io` is a **public shared** acme-dns instance — fine for a quick test, **not production-safe**. Both targets above avoid it.
+
+### Recommended (Windows/PowerShell): delegate to a zone you control — no server
+
+Use **[`scripts/Issue-DnsAlias.ps1`](scripts/Issue-DnsAlias.ps1)** (Posh-ACME `-DnsAlias`). You keep one small delegation zone you control (e.g. `acme.xphox.net` on Azure DNS or Cloudflare); every no-API domain adds one CNAME into it; Posh-ACME — running on Windows — writes the TXT into your zone via that provider's plugin. No acme-dns, no Linux, no Docker.
+
+1. Pick the delegation FQDN, e.g. `example.acme.xphox.net`.
+2. **At the registrar, add ONE CNAME** (covers wildcard + apex of the same root):
+   ```
+   _acme-challenge.example.com.   CNAME   example.acme.xphox.net.
+   ```
+3. Run `Issue-DnsAlias.ps1` → choose your delegation provider (Cloudflare / Azure / Route53 / other) → it issues and **auto-renews** (Posh-ACME stores the plugin + alias).
+
+### Alternative: acme-dns (a dedicated server you run)
+
+The purpose-built tool is **[acme-dns](https://github.com/acme-dns/acme-dns)** — a minimal DNS server whose only job is `_acme-challenge` TXT records. Both win-acme and Posh-ACME support it. Use it if you'd rather run a self-contained delegation server than keep a cloud DNS zone (note: the server is **Linux-only**).
 
 ### How it works (one-time CNAME, then automatic)
 1. The ACME client registers once with an acme-dns server → it hands back a random subdomain like `a1b2c3d4.auth.example.com`.
