@@ -2,6 +2,12 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.31] — 2026-06-25
+
+### Fixed
+- **Orphaned `win-acme renew (acme-staging-v02...)` scheduled task.** win-acme creates a scheduled task per ACME endpoint on issuance. Our staging dry-runs (`preflight.ps1`, `setup-iis.ps1`, `scripts/Preflight-Check.ps1`) `--cancel` the staging *renewal* but win-acme left the now-empty **staging task** behind — so users saw two jobs (a real production one plus a dead staging one). All three scripts now remove the orphaned staging task after the dry-run (matched on the `acme-staging` endpoint name, so the production `acme-v02` task is never touched).
+- To clean an existing orphan on a machine that already ran a staging test: `Get-ScheduledTask | ? { $_.TaskName -match 'acme-staging' } | Unregister-ScheduledTask -Confirm:$false` (elevated).
+
 ## [0.1.30] — 2026-06-25
 
 ### Added (per-domain DNS credentials)

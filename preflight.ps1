@@ -220,6 +220,9 @@ function Invoke-DnsTest {
         $ok = ($LASTEXITCODE -eq 0) -and (Get-ChildItem $tmp -Filter *.pfx -ErrorAction SilentlyContinue)
     }
     try { & $wacs --baseuri $StagingUri --cancel --friendlyname $fn --closeonfinish 2>&1 | Out-Null } catch {}
+    # win-acme makes a per-endpoint scheduled task on issuance; --cancel drops the renewal but NOT the task,
+    # leaving an orphaned 'win-acme renew (acme-staging-v02...)' job. Remove it (production 'acme-v02' never matches).
+    try { Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -match 'acme-staging' } | Unregister-ScheduledTask -Confirm:$false -ErrorAction SilentlyContinue } catch {}
     Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
 
     Write-Host ''

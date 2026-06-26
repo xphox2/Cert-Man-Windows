@@ -272,6 +272,8 @@ if (-not $RunDnsValidationTest) {
             } finally {
                 # Clean up the throwaway renewal and pfx
                 try { & $wacs --baseuri $StagingUri --cancel --friendlyname $friendly --closeonfinish 2>&1 | Out-Null } catch {}
+                # win-acme leaves a per-endpoint staging scheduled task behind after --cancel; remove it.
+                try { Get-ScheduledTask -ErrorAction SilentlyContinue | Where-Object { $_.TaskName -match 'acme-staging' } | Unregister-ScheduledTask -Confirm:$false -ErrorAction SilentlyContinue } catch {}
                 Remove-Item $pfxDir -Recurse -Force -ErrorAction SilentlyContinue
             }
         }
