@@ -124,7 +124,7 @@ $store = ($new.PSParentPath -split '\\')[-1]   # My or WebHosting
 Get-WebBinding -Name "MySite" -Protocol https | ForEach-Object { $_.AddSslCertificate($new.Thumbprint, $store) }
 ```
 
-> The staged variant leaves win-acme renewal driven by the `manual` renewal it created; for IIS it's usually simpler to let `--source iis --installation iis` own the rebind so renewals re-bind automatically.
+> The staged variant leaves the rebind to you. For automatic re-binding on every renewal, let win-acme own it with `--source manual --host "*.example.com" --installation iis --installationsiteid <id>` (the proven wildcard pattern used in the example above), or just run **[`setup-iis.ps1`](setup-iis.ps1)**, which scans your sites and reconciles bindings across all of them. (Do **not** use `--source iis` for a wildcard — wildcard issuance requires the `manual` source with `--installationsiteid`.)
 
 ---
 

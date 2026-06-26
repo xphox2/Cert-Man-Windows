@@ -1,8 +1,10 @@
 # 09 — acme-dns Server Setup
 
-**Use this when** a customer's DNS has no automatable API (Network Solutions / MyDomain.com, locked registrars, internal AD DNS) and you want **hands-off, auto-renewing** DNS-01. You stand up **one** acme-dns server; every customer adds a **single static CNAME** pointing at it, and from then on all their certs validate and renew automatically — regardless of who hosts their DNS.
+**Use this when** you want a **self-contained delegation server you operate** — the MSP model: stand up **one** acme-dns server and every customer (whatever registrar they use, even no-API ones like Network Solutions) adds a **single static CNAME** pointing at it, and from then on all their certs validate and renew automatically.
 
-This is the server side. The client side (win-acme on Windows, Posh-ACME on Azure) is in [Runbook 02 §A](02-Windows-DNS01-Wildcard.md#section-a--any-dns-via-acme-dns-incl-network-solutions--registrars-with-no-api). Background: [acme-dns](https://github.com/acme-dns/acme-dns).
+> **acme-dns is one option, not the only one — and for most cases you don't need to run a server.** **win-acme follows the `_acme-challenge` CNAME automatically** (`Validation.AllowDnsSubstitution = true`, default) to a delegation zone you control, and **Posh-ACME `-DnsAlias`** ([`scripts/Issue-DnsAlias.ps1`](scripts/Issue-DnsAlias.ps1)) does the same in pure PowerShell — both with **no acme-dns server**. Self-host acme-dns (this runbook) only when you specifically want one server that many customers delegate to. The public `https://auth.acme-dns.io` is **test-only, not production-safe** — self-host for production. Alternatives are compared in [Runbook 02 §A](02-Windows-DNS01-Wildcard.md#section-a--any-dns-with-no-api-network-solutions--registrars-without-an-api).
+
+This is the server side. The client side (win-acme on Windows, Posh-ACME on Azure) is in [Runbook 02 §A](02-Windows-DNS01-Wildcard.md#section-a--any-dns-with-no-api-network-solutions--registrars-without-an-api). Background: [acme-dns](https://github.com/acme-dns/acme-dns).
 
 ---
 
@@ -120,7 +122,7 @@ docker run -d --name acme-dns --restart unless-stopped \
 Build/download the binary from [github.com/acme-dns/acme-dns](https://github.com/acme-dns/acme-dns/releases), place `config.cfg` next to it, and run under systemd. Give it `CAP_NET_BIND_SERVICE` so it can bind :53/:80/:443 as non-root.
 
 ### Windows
-acme-dns is a Go binary that runs on Windows too — run `acme-dns.exe` as a service with **NSSM** or `New-Service`, with `config.cfg` alongside. (Linux/Docker is the more common deployment.)
+acme-dns ships **no official Windows binary** (releases are Linux-only). On a Windows host the supported path is **Docker Desktop** (use `Deploy-AcmeDns.ps1` or the compose file above). If you specifically want a native service, build `acme-dns.exe` from Go source (`go build`) and run it under **NSSM** / `New-Service` with `config.cfg` alongside — but Docker is simpler and is what this runbook assumes.
 
 ---
 
@@ -181,4 +183,4 @@ Once the CNAME exists, issuance and **all future renewals are automatic** — th
 
 ### References
 - [acme-dns (GitHub)](https://github.com/acme-dns/acme-dns) · [Docker image](https://hub.docker.com/r/joohoi/acme-dns)
-- Client side: [Runbook 02 §A](02-Windows-DNS01-Wildcard.md#section-a--any-dns-via-acme-dns-incl-network-solutions--registrars-with-no-api) · [win-acme acme-dns](https://www.win-acme.com/reference/plugins/validation/dns/acme-dns) · [Posh-ACME Acme-Dns plugin](https://poshac.me/docs/v4/Plugins/Acme-Dns/)
+- Client side: [Runbook 02 §A](02-Windows-DNS01-Wildcard.md#section-a--any-dns-with-no-api-network-solutions--registrars-without-an-api) · [win-acme acme-dns](https://www.win-acme.com/reference/plugins/validation/dns/acme-dns) · [Posh-ACME Acme-Dns plugin](https://poshac.me/docs/v4/Plugins/Acme-Dns/)

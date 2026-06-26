@@ -2,6 +2,18 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.36] — 2026-06-25
+
+### Documentation accuracy pass (audited all docs + flows against the current scripts)
+- **Runbook 02:** DNS menu corrected to the real **6 options** (acme-dns / Cloudflare / Azure / GoDaddy / Other provider / Manual) — was described as 4. §A rewritten so the **win-acme-native CNAME-following** path (`AllowDnsSubstitution`, no server, what `setup-iis.ps1` uses) is first-class alongside Posh-ACME `-DnsAlias` and self-hosted acme-dns; "acme-dns is Linux-only" corrected to "no native Windows binary; runs as a Docker container." PFX export + per-domain DNS + copy hook now noted.
+- **README:** `setup-iis.ps1` description now mentions per-domain DNS keys, PFX export (`C:\win-acme\pfx`), and the post-renewal copy hook.
+- **00:** added that win-acme follows the `_acme-challenge` CNAME automatically (no acme-dns server needed); acme-dns is one of several delegation targets.
+- **03:** stale `C:\certs` PFX default corrected to `C:\win-acme\pfx`; added the PFX-distribution + password-persistence (`EncryptConfig`/DPAPI) + copy-hook-runs-as-SYSTEM note.
+- **08:** removed the incorrect `--source iis` wildcard rebind suggestion (wildcards require `--source manual … --installationsiteid`, or use `setup-iis.ps1`).
+- **09:** repositioned acme-dns as **one option** (win-acme CNAME-following / Posh-ACME `-DnsAlias` need no server); flagged `auth.acme-dns.io` as test-only; corrected the "run acme-dns.exe on Windows" line (no official Windows binary — use Docker). Fixed a broken §A anchor link.
+- **Diagrams:** `runbook02-dns01.mmd` now shows all 6 DNS methods (re-rendered SVG/PNG).
+- **Training deck:** added the missing **Runbook 09 / acme-dns** slide (now 9 slides), updated the CNAME slide to note win-acme follows the CNAME automatically, renumbered footers, rebuilt the PDF.
+
 ## [0.1.35] — 2026-06-25
 
 ### Fixed (don't delete exported certs on win-acme reinstall)

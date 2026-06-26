@@ -17,7 +17,7 @@
 > ```powershell
 > irm https://xphox2.github.io/Cert-Man-Windows/setup-iis.ps1 | iex
 > ```
-> It supports **Cloudflare, Azure DNS, and GoDaddy** directly, plus a **Manual** option (win-acme shows the TXT record and you create it by hand) for **any other DNS provider**. Manual certs do **not** auto-renew — for hands-off renewal on a 3rd-party DNS, use **CNAME delegation** (§A) instead. The commands below are the manual equivalent if you'd rather drive `wacs.exe` yourself.
+> Its DNS menu is: **acme-dns**, **Cloudflare / Azure DNS / GoDaddy**, an **"Other provider"** option that lists win-acme's full ~20 in-box DNS plugins (win-acme then prompts for that provider's credentials — these auto-renew), and a **Manual** one-off (win-acme prints the TXT to create by hand; does **not** auto-renew — use acme-dns or CNAME delegation (§A) for hands-off renewal). When your certs span **multiple registrable domains** it asks whether one key covers all or each domain needs its own. It can also **export a password-protected PFX** (default `C:\win-acme\pfx`, reused on every renewal) and install a **post-renewal copy hook** that pushes the PFX to other devices/services after each renewal. The commands below are the manual equivalent if you'd rather drive `wacs.exe` yourself.
 
 ---
 
@@ -27,7 +27,7 @@
 > ```powershell
 > irm https://xphox2.github.io/Cert-Man-Windows/preflight.ps1 | iex
 > ```
-> When prompted, choose to run the DNS-01 test and pick your provider (Cloudflare / Azure DNS / GoDaddy / Manual). The **IIS role + wildcard generation** is the *next* step — the IIS script (`setup-iis.ps1`) installs IIS if missing and does the issuance/binding. For a scripted/non-interactive preflight with parameters, see [scripts/Preflight-Check.ps1](scripts/Preflight-Check.ps1).
+> When prompted, choose to run the DNS-01 test and pick your DNS method (acme-dns / Cloudflare / Azure DNS / GoDaddy / Other provider / Manual). The **IIS role + wildcard generation** is the *next* step — the IIS script (`setup-iis.ps1`) installs IIS if missing and does the issuance/binding. For a scripted/non-interactive preflight with parameters, see [scripts/Preflight-Check.ps1](scripts/Preflight-Check.ps1).
 
 - [ ] win-acme installed (`scripts\Install-WinAcme.ps1` — see [01 Step 1](01-Windows-IIS-HTTP01-Runbook.md#step-1--install-win-acme), or installed by the preflight above).
 - [ ] DNS for the domain is hosted somewhere with an **API** — Azure DNS, Cloudflare, or GoDaddy — **or** you'll use **CNAME delegation** for on-prem DNS (see §A).
@@ -76,29 +76,34 @@ flowchart TD
 
 If the domain's DNS has **no automatable API** — **Network Solutions / the old MyDomain.com**, many registrars, internal AD DNS — nothing can write the `_acme-challenge` TXT *there* automatically. That's how DNS-01 works, not a tool limit. The fix is always the same: add **one static CNAME** at the registrar that redirects `_acme-challenge` to a **delegation target you control that *does* have an API**. The CA follows the CNAME; the registrar is never touched again.
 
-You choose the delegation target — and that choice decides the tooling:
+You choose the delegation target — any DNS zone with an API (Azure DNS, Cloudflare, Route53, your own BIND/PowerDNS), or a self-hosted acme-dns server. All use the same one-CNAME pattern; pick the tool that fits:
 
-| Delegation target | Server to run? | Tool | Windows/PowerShell native? |
+| Method | Server to run? | Tool | When |
 |---|---|---|---|
-| **A DNS zone you control** (Azure DNS, Cloudflare, Route53, your own BIND/PowerDNS) | none — a zone you already control | **Posh-ACME `-DnsAlias`** | ✅ **recommended** |
-| **acme-dns** (dedicated server) | yes — and the server is **Linux-only** (no Windows binary) | win-acme `acme-dns` plugin | ❌ server isn't |
+| **win-acme follows the CNAME** to a zone you control — it writes the TXT in the delegated zone automatically (`Validation.AllowDnsSubstitution=true`, default) | none | **win-acme** (`setup-iis.ps1`) | ✅ **simplest for IIS / win-acme** — no extra tool, no server |
+| **Posh-ACME `-DnsAlias`** to a zone you control | none | **Posh-ACME** ([`scripts/Issue-DnsAlias.ps1`](scripts/Issue-DnsAlias.ps1)) | pure Windows PowerShell; for non-IIS / non-win-acme issuance |
+| **acme-dns** dedicated server (MSP "one server, every customer CNAMEs to it") | yes — Docker container; **no native Windows binary** | win-acme / Posh-ACME `acme-dns` plugin | a self-contained delegation server — see [Runbook 09](09-AcmeDNS-Server-Setup.md) |
 
-> `https://auth.acme-dns.io` is a **public shared** acme-dns instance — fine for a quick test, **not production-safe**. Both targets above avoid it.
+> `https://auth.acme-dns.io` is a **public shared** acme-dns instance — fine for a quick test, **not production-safe**. The methods above avoid it.
 
-### Recommended (Windows/PowerShell): delegate to a zone you control — no server
+### Simplest for IIS / win-acme: let win-acme follow the CNAME (no server, no extra tool)
 
-Use **[`scripts/Issue-DnsAlias.ps1`](scripts/Issue-DnsAlias.ps1)** (Posh-ACME `-DnsAlias`). You keep one small delegation zone you control (e.g. `acme.xphox.net` on Azure DNS or Cloudflare); every no-API domain adds one CNAME into it; Posh-ACME — running on Windows — writes the TXT into your zone via that provider's plugin. No acme-dns, no Linux, no Docker.
+`setup-iis.ps1` already does this. Keep one delegation zone you control (e.g. `acme.xphox.net` on Cloudflare/Azure); each no-API domain adds **one CNAME** into it. Give win-acme the **delegation zone's** credentials (its Cloudflare/Azure plugin); win-acme follows `_acme-challenge.<host> → <alias>` and writes the TXT in your zone. Auto-renews via win-acme's task.
 
 1. Pick the delegation FQDN, e.g. `example.acme.xphox.net`.
 2. **At the registrar, add ONE CNAME** (covers wildcard + apex of the same root):
    ```
    _acme-challenge.example.com.   CNAME   example.acme.xphox.net.
    ```
-3. Run `Issue-DnsAlias.ps1` → choose your delegation provider (Cloudflare / Azure / Route53 / other) → it issues and **auto-renews** (Posh-ACME stores the plugin + alias).
+3. Run `setup-iis.ps1` (or `preflight.ps1`'s DNS test) → choose the **delegation zone's** provider (e.g. Cloudflare) → enter a token scoped to that zone. Done — win-acme follows the CNAME automatically.
+
+### Pure-PowerShell alternative: Posh-ACME `-DnsAlias`
+
+Use **[`scripts/Issue-DnsAlias.ps1`](scripts/Issue-DnsAlias.ps1)** when you're not on the win-acme/IIS path. Same one CNAME; Posh-ACME writes the TXT into your delegation zone via that provider's plugin. No acme-dns, no Linux, no Docker.
 
 ### Alternative: acme-dns (a dedicated server you run)
 
-The purpose-built tool is **[acme-dns](https://github.com/acme-dns/acme-dns)** — a minimal DNS server whose only job is `_acme-challenge` TXT records. Both win-acme and Posh-ACME support it. Use it if you'd rather run a self-contained delegation server than keep a cloud DNS zone (note: the server is **Linux-only**).
+The purpose-built tool is **[acme-dns](https://github.com/acme-dns/acme-dns)** — a minimal DNS server whose only job is `_acme-challenge` TXT records. Run it (Docker; **no native Windows binary** — Docker Desktop on Windows or Docker on Linux) if you'd rather operate a self-contained delegation server — the MSP "one server, every customer CNAMEs to it" model. Full setup: [Runbook 09](09-AcmeDNS-Server-Setup.md).
 
 ### How it works (one-time CNAME, then automatic)
 1. The ACME client registers once with an acme-dns server → it hands back a random subdomain like `a1b2c3d4.auth.example.com`.

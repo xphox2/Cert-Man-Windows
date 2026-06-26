@@ -1,26 +1,30 @@
 flowchart TD
-    A([Wildcard, internal host, or port 80 blocked]) --> B{Where is the<br/>DNS hosted?}
+    A([Wildcard, internal host, or port 80 blocked]) --> B{Which DNS method?}
     B -->|Azure DNS| C1[Service principal scoped to zone<br/>DNS Zone Contributor]
     B -->|Cloudflare| C2[Scoped API token<br/>Zone:DNS:Edit + Zone:Read]
-    B -->|GoDaddy / other| C3[API key + secret]
-    B -->|"On-prem / no API"| C4[CNAME delegation to<br/>Cloudflare / Azure / acme-dns]
+    B -->|GoDaddy| C3[API key + secret]
+    B -->|Other provider| C5[Any of win-acme's ~20 DNS plugins<br/>win-acme prompts for credentials]
+    B -->|"No-API registrar<br/>(Network Solutions, etc.)"| C4[One CNAME to a zone you control;<br/>win-acme follows it AllowDnsSubstitution,<br/>or acme-dns / Posh-ACME -DnsAlias]
+    B -->|Manual one-off| C6[win-acme prints the TXT;<br/>does NOT auto-renew]
 
     C1 --> D[Issue against STAGING]
     C2 --> D
     C3 --> D
     C4 --> D
+    C5 --> D
+    C6 --> D
     D --> E{Success?}
     E -->|No| F[Fix zone / creds / propagation<br/>see Runbook 07]
     F --> D
     E -->|Yes| G[Switch to PRODUCTION<br/>and re-issue]
-    G --> H[Verify, bind in IIS, add to monitoring]
+    G --> H[Verify, bind in IIS, optional PFX export,<br/>add to monitoring]
     H --> I([Done: auto-renew via DNS-01])
 
     classDef act fill:#1f6feb,stroke:#0b3d91,color:#ffffff;
     classDef dec fill:#fff3cd,stroke:#d39e00,color:#000000;
     classDef ok fill:#1a7f37,stroke:#0b3d20,color:#ffffff,font-weight:bold;
     classDef warn fill:#f8d7da,stroke:#b02a37,color:#000000;
-    class C1,C2,C3,C4,D,G,H act;
+    class C1,C2,C3,C4,C5,C6,D,G,H act;
     class B,E dec;
     class F warn;
     class I ok;

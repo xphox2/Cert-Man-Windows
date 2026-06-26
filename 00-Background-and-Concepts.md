@@ -89,6 +89,8 @@ You do **not** need to expose your internal DNS. Delegate just the challenge rec
 
 The host name itself stays on internal DNS; only the throwaway challenge record is delegated. This is the standard way to do DNS-01 for internal servers.
 
+> **win-acme follows the CNAME automatically** (`Validation.AllowDnsSubstitution = true` by default), so for the win-acme path you do **not** need an acme-dns server — just delegate the CNAME to a zone you control and give win-acme that zone's credentials. Posh-ACME does the same via `-DnsAlias`. A self-hosted acme-dns server is only one of several delegation targets (see [Runbook 02 §A](02-Windows-DNS01-Wildcard.md#section-a--any-dns-with-no-api-network-solutions--registrars-without-an-api)).
+
 ---
 
 ## 5. Rate limits — why we always test in staging

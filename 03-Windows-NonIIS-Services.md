@@ -182,7 +182,7 @@ Location: `%programdata%\win-acme\settings.json` (or alongside `wacs.exe` in a p
   },
   "Store": {
     "CertificateStore": { "DefaultStore": "My" },
-    "PfxFile": { "DefaultPath": "C:\\certs" }
+    "PfxFile": { "DefaultPath": "C:\\win-acme\\pfx" }
   },
   "Notification": {
     "SmtpServer": "smtp.example.com",
@@ -203,9 +203,11 @@ Location: `%programdata%\win-acme\settings.json` (or alongside `wacs.exe` in a p
 | `ScheduledTask.RandomDelay` | Spreads load so all servers don't hit the CA at once. |
 | `Notification.*` | Email alerts on failure — set this so silent failures still notify. `EmailOnSuccess:false` keeps noise down. |
 | `Store.CertificateStore.DefaultStore` | `My` = LocalMachine\Personal, where services bind by thumbprint. |
-| `Store.PfxFile.DefaultPath` | Where PFX files go when a service needs a file rather than the store. |
+| `Store.PfxFile.DefaultPath` | Where PFX files go when a service needs a file rather than the store. The handbook default is **`C:\win-acme\pfx`** (everything colocated under the win-acme tree). |
 
 > Field names vary slightly across win-acme versions; run `.\wacs.exe --help` and consult the [settings reference](https://www.win-acme.com/reference/settings) to confirm for your build. `Install-WinAcme.ps1` writes a working baseline.
+
+> **Distributing the PFX to this server automatically.** `setup-iis.ps1` can export a PFX (default `C:\win-acme\pfx`) and run a **post-renewal copy hook** that pushes it to other devices after every renewal — feed that PFX into the deploy scripts below. The exported PFX keeps the **same password across renewals** (win-acme stores it encrypted via `EncryptConfig`/DPAPI, so the SYSTEM renewal task can reuse it), so the import on this server never has to change. The copy hook runs as **SYSTEM**: UNC targets must grant the computer account (`DOMAIN\MACHINE$`) write access, otherwise share a local folder and have each device **pull** from it. See [`scripts/Copy-RenewedPfx.ps1`](scripts/Copy-RenewedPfx.ps1).
 
 ---
 
