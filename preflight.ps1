@@ -80,8 +80,14 @@ function Get-File {
     (New-Object System.Net.WebClient).DownloadFile($Url, $Dest)
 }
 function Install-WinAcmeInline {
-    # Clean reinstall so a previous TRIMMED build can't leave stale files behind.
-    Remove-Item $WinAcmePath -Recurse -Force -ErrorAction SilentlyContinue
+    # Clean reinstall so a previous TRIMMED build can't leave stale binaries behind - but PRESERVE
+    # user data that lives in the same folder (exported pfx, the post-renewal hook, our cache).
+    # Only win-acme's own files (exe/dll/json/logs) are removed; certs are never touched.
+    if (Test-Path $WinAcmePath) {
+        Get-ChildItem $WinAcmePath -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ne 'pfx' -and $_.Name -ne '.cmw-cache' -and $_.Name -notlike 'post-renew-copy.*' } |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    }
     New-Item -ItemType Directory -Path $WinAcmePath -Force | Out-Null
     # Use the PLUGGABLE build (the trimmed build cannot load external DNS plugins).
     $asset = (Get-WinAcmeRelease).assets | Where-Object name -like '*x64.pluggable.zip' | Select-Object -First 1

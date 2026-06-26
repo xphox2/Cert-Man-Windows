@@ -2,6 +2,11 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.35] — 2026-06-25
+
+### Fixed (don't delete exported certs on win-acme reinstall)
+- **`preflight.ps1`'s win-acme (re)install used to wipe the entire `C:\win-acme` folder** (`Remove-Item $WinAcmePath -Recurse`), which would have deleted `C:\win-acme\pfx` (exported certs), the post-renewal hook, and the cache whenever win-acme was upgraded/repaired. It now removes **only win-acme's own binaries/config/logs** and **preserves** `pfx\`, `.cmw-cache`, and `post-renew-copy.*`. So exported certs survive win-acme upgrades. (win-acme's own extract-over updates never deleted them; this was our clean-reinstall step.)
+
 ## [0.1.34] — 2026-06-25
 
 ### Changed
