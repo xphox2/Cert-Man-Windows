@@ -11,8 +11,8 @@
     "Auto-copy after each renewal"). Use THIS script when wiring a renewal manually, e.g.:
 
         wacs.exe ... --installation iis,script `
-            --script "C:\CertMan\scripts\Copy-RenewedPfx.ps1" `
-            --scriptparameters "-SourceDir 'C:\CertMan\pfx' -Destinations '\\dev1\certs','\\dev2\certs'"
+            --script "C:\win-acme\Copy-RenewedPfx.ps1" `
+            --scriptparameters "-SourceDir 'C:\win-acme' -Destinations '\\dev1\certs','\\dev2\certs'"
 
 .PARAMETER SourceDir
     Folder win-acme writes the PFX into (the --pfxfilepath / pfxfile store folder).
@@ -21,7 +21,7 @@
     One or more destination folders (local or UNC) to copy every *.pfx into.
 
 .PARAMETER LogFile
-    Append a one-line result per destination here. Default C:\CertMan\post-renew-copy.log.
+    Append a one-line result per destination here. Default C:\win-acme\post-renew-copy.log.
 
 .NOTES
     win-acme's renewal task runs as SYSTEM. For UNC destinations the COMPUTER account
@@ -31,7 +31,7 @@
 param(
     [Parameter(Mandatory)][string]$SourceDir,
     [Parameter(Mandatory)][string[]]$Destinations,
-    [string]$LogFile = 'C:\CertMan\post-renew-copy.log'
+    [string]$LogFile = 'C:\win-acme\post-renew-copy.log'
 )
 
 $ErrorActionPreference = 'Stop'

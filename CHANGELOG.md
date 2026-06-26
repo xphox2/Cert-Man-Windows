@@ -2,6 +2,11 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.33] — 2026-06-25
+
+### Changed
+- **Everything now lives in one folder: the win-acme install dir (`C:\win-acme`).** The PFX export default is now `$WinAcmePath` (was `C:\CertMan\pfx`), and the post-renewal copy hook script + its log are written there too (`C:\win-acme\post-renew-copy.ps1` / `.log`, was `C:\CertMan\...`). No more separate `C:\CertMan` tree — cache, logs, certs, PFX, and the hook are all colocated with win-acme. `scripts/Copy-RenewedPfx.ps1` default `-LogFile` updated to match.
+
 ## [0.1.32] — 2026-06-25
 
 ### Fixed (prevent the staging task instead of deleting it)
