@@ -203,8 +203,9 @@ function Invoke-DnsTest {
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
     $fn = "PREFLIGHT $testHost"; $pw = [guid]::NewGuid().ToString('N')
     $log = Join-Path $WinAcmePath 'preflight-dns-test.log'
+    # --notaskscheduler: throwaway staging test - do NOT let win-acme create a scheduled task for it.
     $a = @('--baseuri', $StagingUri, '--source', 'manual', '--host', $testHost) + $sel.Args +
-         @('--store', 'pfxfile', '--pfxfilepath', $tmp, '--pfxpassword', $pw, '--installation', 'none',
+         @('--store', 'pfxfile', '--pfxfilepath', $tmp, '--pfxpassword', $pw, '--installation', 'none', '--notaskscheduler',
            '--emailaddress', $email, '--accepttos', '--friendlyname', $fn, '--closeonfinish', '--verbose')
 
     Write-Host ''

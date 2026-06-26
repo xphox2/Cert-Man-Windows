@@ -255,9 +255,10 @@ if (-not $RunDnsValidationTest) {
             $friendly = "PREFLIGHT-TEST $TestHost"
             $pw = [guid]::NewGuid().ToString('N')
             Add-Result 'DNS-01 test' 'INFO' "Issuing STAGING cert for $TestHost via $DnsProvider (this writes+removes a TXT record)..."
+            # --notaskscheduler: throwaway staging test - do NOT let win-acme create a scheduled task for it.
             $wacsArgs = @('--baseuri', $StagingUri, '--source', 'manual', '--host', $TestHost) + $val +
                     @('--store', 'pfxfile', '--pfxfilepath', $pfxDir, '--pfxpassword', $pw,
-                      '--installation', 'none', '--emailaddress', $NotifyEmail, '--accepttos',
+                      '--installation', 'none', '--notaskscheduler', '--emailaddress', $NotifyEmail, '--accepttos',
                       '--friendlyname', $friendly, '--closeonfinish')
             try {
                 & $wacs @wacsArgs 2>&1 | Out-Null

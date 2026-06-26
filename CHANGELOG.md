@@ -2,6 +2,11 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.32] — 2026-06-25
+
+### Fixed (prevent the staging task instead of deleting it)
+- The staging dry-runs in `preflight.ps1`, `setup-iis.ps1`, and `scripts/Preflight-Check.ps1` now pass win-acme's **`--notaskscheduler`** flag, so win-acme **never creates** the throwaway `acme-staging` scheduled task in the first place (cleaner than the v0.1.31 delete-after-the-fact approach, which is kept as a safety net to sweep orphans from older runs). Production issuance is unchanged — it still gets its renewal task. Root cause: win-acme auto-creates a scheduled task per ACME endpoint on every successful issuance; the staging dry-run is a real (staging) issuance, so it was triggering that.
+
 ## [0.1.31] — 2026-06-25
 
 ### Fixed

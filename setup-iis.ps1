@@ -259,9 +259,10 @@ function Test-StagingCert {
     New-Item -ItemType Directory $tmp -Force | Out-Null
     $fn = "[CertMan-STAGING] $hostArg"
     $log = Join-Path $WinAcmePath ("staging-{0}.log" -f ($hostArg -replace '[^a-z0-9]', '_'))
+    # --notaskscheduler: this is a throwaway staging test - do NOT let win-acme create a scheduled task for it.
     $a = @('--baseuri', $StagingUri, '--source', 'manual', '--host', $hostArg) + $Val +
          @('--store', 'pfxfile', '--pfxfilepath', $tmp, '--pfxpassword', [guid]::NewGuid().ToString('N'),
-           '--installation', 'none', '--emailaddress', $Email, '--accepttos', '--friendlyname', $fn, '--closeonfinish', '--verbose')
+           '--installation', 'none', '--notaskscheduler', '--emailaddress', $Email, '--accepttos', '--friendlyname', $fn, '--closeonfinish', '--verbose')
     $r = Invoke-WacsRetry -Wacs $Wacs -WacsArgs $a -IsSuccess { $LASTEXITCODE -eq 0 }
     $out = $r.Out
     $out | Out-File -FilePath $log -Encoding utf8
