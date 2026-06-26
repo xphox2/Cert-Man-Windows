@@ -12,7 +12,7 @@
 
         wacs.exe ... --installation iis,script `
             --script "C:\win-acme\Copy-RenewedPfx.ps1" `
-            --scriptparameters "-SourceDir 'C:\win-acme' -Destinations '\\dev1\certs','\\dev2\certs'"
+            --scriptparameters "-SourceDir 'C:\win-acme\pfx' -Destinations '\\dev1\certs','\\dev2\certs'"
 
 .PARAMETER SourceDir
     Folder win-acme writes the PFX into (the --pfxfilepath / pfxfile store folder).

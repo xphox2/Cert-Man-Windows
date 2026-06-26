@@ -2,6 +2,11 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.34] — 2026-06-25
+
+### Changed
+- PFX export default is now **`C:\win-acme\pfx`** (a `pfx` subfolder of the win-acme install dir), keeping exported certs out of the program-file root while still under the single win-acme tree. The copy-hook script + log remain at `C:\win-acme\`. `scripts/Copy-RenewedPfx.ps1` example `-SourceDir` updated to `C:\win-acme\pfx`.
+
 ## [0.1.33] — 2026-06-25
 
 ### Changed

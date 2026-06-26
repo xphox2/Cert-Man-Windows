@@ -350,8 +350,9 @@ function Invoke-Generate {
     $pfxDir = $null; $pfxPw = $null; $copyScript = $null
     Write-Host ''
     if ((Read-Host '  Also export a PFX of each cert (to copy to other devices/services)? [y/N]') -match '^(y|yes)$') {
-        $d = Read-Host ("  PFX output folder [default $WinAcmePath - same folder as win-acme]")
-        $pfxDir = if ($d) { $d } else { $WinAcmePath }
+        $pfxDefault = Join-Path $WinAcmePath 'pfx'
+        $d = Read-Host ("  PFX output folder [default $pfxDefault]")
+        $pfxDir = if ($d) { $d } else { $pfxDefault }
         New-Item -ItemType Directory -Path $pfxDir -Force | Out-Null
         $pfxPw = Read-Host '  PFX password (protects the exported file)'
         if (-not $pfxPw) { $pfxPw = [guid]::NewGuid().ToString('N'); Write-Host "  (no password entered - generated one: $pfxPw )" -ForegroundColor DarkGray }
