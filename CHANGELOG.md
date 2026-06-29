@@ -2,6 +2,13 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.37] — 2026-06-29
+
+### Added (`generate-cert.ps1` — generate + export, no IIS)
+- **New standalone script `generate-cert.ps1`** for a dedicated UTIL / issuer server: it does **NOT** scan or bind IIS ("the loading part"). You **type** the host name(s); it validates via DNS-01 on live Let's Encrypt and **exports a password-protected PFX** (default `C:\win-acme\pfx`) you copy out to the servers/devices that actually serve it. Runs like the others: `irm https://xphox2.github.io/Cert-Man-Windows/generate-cert.ps1 | iex`. Self-elevates, loops to issue several certs, optionally also imports into `LocalMachine\My`, and can install the post-renewal PFX copy hook.
+- **Multiple wildcards + apex on ONE certificate.** The host prompt accepts comma-separated names at any wildcard depth, e.g. `domain.com, *.domain.com, *.1.domain.com, *.2.domain.com, *.3.domain.com`. All names collapse to a single DNS zone, so DNS credentials are requested once.
+- **New DNS method `7) Manual + auto-verify (ONE-TIME)`** built on win-acme's DNS **validation-script** plugin. win-acme **blocks until our generated verify script confirms propagation**, so it never submits to Let's Encrypt early — meaning **the token is never invalidated and you add the TXT record exactly once** (fixes the classic "press Enter too soon → new token → re-edit DNS" loop). The verify loop polls **authoritative nameservers** (what Let's Encrypt actually queries) **plus six public resolvers** (8.8.8.8 / 8.8.4.4 / 1.1.1.1 / 1.0.0.1 / 9.9.9.9 / 208.67.222.222) — explicitly **not** local DNS — clearing the local client cache each pass. On timeout it **extends and keeps waiting instead of failing**, so an order is never aborted out from under you. The TXT record is also saved to `%TEMP%\MANUAL-DNS-TODO.txt`. This method passes **`--notaskscheduler`** (one-time cert, no renewal task) since manual DNS can't auto-renew unattended.
+
 ## [0.1.36] — 2026-06-25
 
 ### Documentation accuracy pass (audited all docs + flows against the current scripts)

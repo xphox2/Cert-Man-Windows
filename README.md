@@ -26,7 +26,15 @@ irm https://xphox2.github.io/Cert-Man-Windows/setup-iis.ps1 | iex
 
 It validates IIS (installs the role if missing), scans every site/binding, groups host names into the **minimum set of wildcard certs** (names sharing a parent domain collapse onto one cert; the apex becomes a SAN), shows what's already covered, and — if all checks out — **offers to generate the missing certs on the live Let's Encrypt server** and bind them to IIS. When certs span **multiple registrable domains** it can use a different DNS provider/key per domain. It can also **export a password-protected PFX** (default `C:\win-acme\pfx`, reused on every renewal) and install a **post-renewal copy hook** that pushes the PFX to other devices/services after each renewal.
 
-<sub>Served via GitHub Pages. Raw fallback: `irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex` (and `.../setup-iis.ps1`). A non-interactive/scriptable preflight is also available: [`scripts/Preflight-Check.ps1`](scripts/Preflight-Check.ps1).</sub>
+**Generate + export only** (no IIS — for a dedicated UTIL / issuer server):
+
+```powershell
+irm https://xphox2.github.io/Cert-Man-Windows/generate-cert.ps1 | iex
+```
+
+It does **not** scan or bind IIS — you **type** the host name(s) (multiple wildcards + apex on one cert are supported, e.g. `domain.com, *.domain.com, *.1.domain.com`), it issues via DNS-01, and **exports a password-protected PFX** (`C:\win-acme\pfx`) to copy to other servers/devices. Includes a **one-time "Manual + auto-verify"** DNS method: add the TXT record **once** and it waits, checking **authoritative + public DNS** (never local cache) until verified — it never fails early, so the token never changes and you never re-edit DNS.
+
+<sub>Served via GitHub Pages. Raw fallback: `irm https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/preflight.ps1 | iex` (and `.../setup-iis.ps1`, `.../generate-cert.ps1`). A non-interactive/scriptable preflight is also available: [`scripts/Preflight-Check.ps1`](scripts/Preflight-Check.ps1).</sub>
 
 ---
 
@@ -113,6 +121,7 @@ flowchart TD
 | [09-AcmeDNS-Server-Setup.md](09-AcmeDNS-Server-Setup.md) | **acme-dns server** — stand up one server so any registrar with no API (Network Solutions, etc.) auto-renews via a one-time CNAME. MSP model. |
 | [preflight.ps1](preflight.ps1) | **Preflight** (ACME + DNS) — validate + auto-install win-acme, optional DNS-01 staging test. `irm .../preflight.ps1 \| iex` |
 | [setup-iis.ps1](setup-iis.ps1) | **IIS certificate setup** — validate IIS, scan sites, plan wildcard certs (collapsing shared parents), per-domain DNS keys, then generate + bind on live Let's Encrypt; optional PFX export (`C:\win-acme\pfx`) + post-renewal copy hook. `irm .../setup-iis.ps1 \| iex` |
+| [generate-cert.ps1](generate-cert.ps1) | **Generate + export (no IIS)** — for a dedicated UTIL/issuer server: type the host name(s) (multiple wildcards + apex on one cert), issue via DNS-01, export a password-protected PFX to share out. Includes a **one-time "Manual + auto-verify"** DNS method that waits on authoritative + public DNS until propagated (never local cache, never fails early, so the TXT is added once). `irm .../generate-cert.ps1 \| iex` |
 | [scripts/](scripts/) | Ready-to-run PowerShell: win-acme install, deploy-to-service, monitoring, Posh-ACME renewal, cert inventory + safe removal (migration), scriptable preflight, no-API-registrar issuance via DNS alias (`Issue-DnsAlias.ps1`), **post-renewal PFX copy** (`Copy-RenewedPfx.ps1`), acme-dns server deploy. |
 | [acme-dns/](acme-dns/) | `docker-compose.yml` + `config.cfg.example` to stand up an acme-dns server (see [Runbook 09](09-AcmeDNS-Server-Setup.md)). |
 | [docs/diagrams/](docs/diagrams/) | All flow diagrams (Mermaid source + SVG/PNG exports) for training and slides. |
