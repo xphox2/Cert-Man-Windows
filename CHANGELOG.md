@@ -2,6 +2,12 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.42] — 2026-06-29
+
+### Added (`generate-cert.ps1` — DNS-reachability pre-flight to prevent the "freezes on the server" hang)
+- A real run hung on a locked-down Windows Server while the same script ran fine on a workstation. Cause (confirmed by comparing logs): win-acme **always queries the domain's authoritative nameservers directly on port 53** before showing the TXT record — and it does this even with pre-validation disabled (verified: `PreValidateDns=false` + `AllowDnsSubstitution=false` still query the nameservers). On the workstation the nameservers answer instantly (even "Query Refused"); on the server the firewall **silently drops** outbound DNS to those IPs, so win-acme stacks query timeouts and appears frozen (had to be Ctrl+C'd). No win-acme setting avoids this.
+- The script now runs a **pre-flight reachability check** before issuance: for each cert's zone it resolves the authoritative nameservers (via a public resolver) and tests TCP/53 with a short timeout. If unreachable it prints a clear **`[WARN] DNS reachability`** message naming the nameservers, explains win-acme will likely hang, and offers the fixes (run on a machine with open DNS and copy the PFX, or open outbound UDP+TCP 53), then asks before continuing — instead of mysteriously freezing. Reachable zones print `[OK ]` and proceed. The check is bounded (~3 s/nameserver) so it never hangs.
+
 ## [0.1.41] — 2026-06-29
 
 ### Changed (`generate-cert.ps1` — warn which name the TXT record goes under)

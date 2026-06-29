@@ -108,6 +108,36 @@ function Find-NewestCovering {
     return $best
 }
 
+# --------------------------------------------- DNS reachability pre-flight --
+function Test-Tcp {
+    # Quick TCP connect test with a short timeout (no long hang on black-holed ports).
+    param([string]$ComputerName, [int]$Port = 53, [int]$TimeoutMs = 3000)
+    $c = New-Object System.Net.Sockets.TcpClient
+    try {
+        $iar = $c.BeginConnect($ComputerName, $Port, $null, $null)
+        if (-not $iar.AsyncWaitHandle.WaitOne($TimeoutMs)) { return $false }
+        $c.EndConnect($iar); return $true
+    } catch { return $false } finally { $c.Close() }
+}
+function Test-ZoneDnsReachable {
+    # win-acme ALWAYS queries the domain's authoritative nameservers directly (port 53) before it
+    # shows the TXT record - even with pre-validation off. On a locked-down server those queries
+    # hit a firewall black-hole and win-acme appears to FREEZE (stacked timeouts). Detect that here
+    # and turn the mystery hang into a clear message. Returns @{ Checked; Reachable; Ns }.
+    param([string]$Zone)
+    $ns = @(Resolve-DnsName $Zone -Type NS -Server 8.8.8.8 -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction SilentlyContinue | Where-Object { $_.Type -eq 'NS' } | ForEach-Object { $_.NameHost })
+    if (-not $ns.Count) { return [pscustomobject]@{ Checked = $false; Reachable = $true; Ns = @() } }  # can't determine - don't block
+    $ips = @()
+    foreach ($h in $ns) { $ips += @(Resolve-DnsName $h -Type A -Server 8.8.8.8 -DnsOnly -NoHostsFile -QuickTimeout -ErrorAction SilentlyContinue | Where-Object { $_.Type -eq 'A' } | ForEach-Object { $_.IPAddress }) }
+    $ips = @($ips | Select-Object -Unique)
+    if (-not $ips.Count) { return [pscustomobject]@{ Checked = $false; Reachable = $true; Ns = $ns } }
+    # Reachable if ANY authoritative nameserver answers a TCP/53 connect quickly (a firewall that
+    # blocks outbound DNS drops both UDP and TCP, so this is a reliable proxy without a long hang).
+    $reachable = $false
+    foreach ($ip in $ips) { if (Test-Tcp -ComputerName $ip -Port 53 -TimeoutMs 3000) { $reachable = $true; break } }
+    return [pscustomobject]@{ Checked = $true; Reachable = $reachable; Ns = $ns; Ips = $ips }
+}
+
 # --------------------------------------------- win-acme plugin install ------
 function Get-WinAcmeRelease { Invoke-RestMethod 'https://api.github.com/repos/win-acme/win-acme/releases/latest' -Headers @{ 'User-Agent' = 'cert-man' } }
 function Install-WinAcmePlugin {
@@ -311,6 +341,28 @@ function Invoke-GenerateOne {
     if ($zones.Count -gt 1) {
         Write-Host '   This cert spans more than one DNS zone. The DNS method you pick must be able to' -ForegroundColor Yellow
         Write-Host '   create the _acme-challenge record in EVERY zone above (or use Manual / acme-dns).' -ForegroundColor Yellow
+    }
+
+    # --- Pre-flight: can THIS machine reach the zone's nameservers on port 53? -------------
+    # win-acme queries them directly; if a firewall black-holes outbound DNS, it FREEZES on
+    # timeouts (the classic "works on my PC, hangs on the locked-down server"). Warn early.
+    foreach ($z in $zones) {
+        $r = Test-ZoneDnsReachable -Zone $z
+        if ($r.Checked -and -not $r.Reachable) {
+            Write-Host ''
+            Status 'WARN' 'DNS reachability' ("this machine cannot reach {0}'s nameservers on port 53" -f $z)
+            Write-Host ("   Nameservers: {0}" -f ($r.Ns -join ', ')) -ForegroundColor DarkGray
+            Write-Host '   win-acme queries these directly to validate, so it will likely HANG here (stacked DNS' -ForegroundColor Yellow
+            Write-Host '   timeouts) - this is the "works on my PC but freezes on the server" case. Fix options:' -ForegroundColor Yellow
+            Write-Host '     - EASIEST: run this on a machine with open outbound DNS (e.g. your workstation), then' -ForegroundColor Yellow
+            Write-Host '       copy the exported PFX to the server. (That is what this generate+export tool is for.)' -ForegroundColor Yellow
+            Write-Host '     - OR allow outbound UDP+TCP port 53 from this machine, then re-run.' -ForegroundColor Yellow
+            if ((Read-Host '   Continue anyway (it may freeze)? [y/N]') -notmatch '^(y|yes)$') {
+                Write-Host '   Skipped this certificate.' -ForegroundColor Yellow; return
+            }
+        } elseif ($r.Checked) {
+            Status 'OK' 'DNS reachability' ("{0} nameservers reachable on :53" -f $z)
+        }
     }
 
     # --- DNS validation method (one per cert) ------------------------------
