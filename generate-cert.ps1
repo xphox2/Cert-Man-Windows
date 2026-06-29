@@ -393,7 +393,11 @@ function Invoke-GenerateOne {
     # --- Production issuance (NO IIS binding) ------------------------------
     Write-Host ''
     Write-Host '  >>> PRODUCTION: live, trusted certificate (counts against rate limits, 50/domain/week). <<<' -ForegroundColor Yellow
-    if ((Read-Host '  Generate on PRODUCTION now? [y/N]') -notmatch '^(y|yes)$') {
+    if ($s.Manual -or $s.AcmeDns) {
+        Write-Host '  Say YES to continue: win-acme will then DISPLAY the TXT record(s) for you to create.' -ForegroundColor Cyan
+        Write-Host '  Nothing is issued until you add them and DNS verifies - this is the step where records appear.' -ForegroundColor Cyan
+    }
+    if ((Read-Host '  Proceed and show the DNS record(s) to create now? [y/N]') -notmatch '^(y|yes)$') {
         Write-Host '  Skipped - nothing was requested from Let''s Encrypt.' -ForegroundColor Yellow; return
     }
 

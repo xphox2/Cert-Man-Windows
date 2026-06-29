@@ -2,6 +2,11 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.40] — 2026-06-29
+
+### Changed (`generate-cert.ps1` — make clear the production prompt is where DNS records appear)
+- For **manual / acme-dns** methods, the TXT (or CNAME) records can only be displayed **after** the live order is created, because the challenge tokens do not exist until then. Operators were answering **No** at the `Generate on PRODUCTION now?` prompt expecting to see the records first, so nothing was requested. The prompt is reworded to **`Proceed and show the DNS record(s) to create now? [y/N]`** with a note that **nothing is issued until you add the records and DNS verifies** — saying Yes is the step that displays the records and starts the guided, pre-validated wait. No behavior change; wording/clarity only.
+
 ## [0.1.39] — 2026-06-29
 
 ### Fixed (`generate-cert.ps1` option 7 — no TXT shown / no success / "prompts individually")
