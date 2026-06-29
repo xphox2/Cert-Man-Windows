@@ -2,6 +2,13 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.38] — 2026-06-29
+
+### Fixed (antivirus / "Block at First Sight" false positive on `generate-cert.ps1`)
+- **Root cause:** `generate-cert.ps1` previously **synthesized executable PowerShell at runtime** (it wrote `manual-dns-verify.ps1` / `manual-dns-cleanup.ps1` to disk and had win-acme run them) and embedded that code as a large here-string with an effectively-infinite `while ($true)` DNS-polling loop. Static scanning was clean (AMSI whole-file CLEAN, Defender file-scan of the artifacts found no threats), but Defender's **Block at First Sight** (cloud reputation + behavioral ML) flags this *generate-a-script-then-execute-it* "dropper" pattern on a brand-new, zero-prevalence file — whereas `preflight.ps1` (long-standing, never writes scripts) is trusted. That is the difference between the two scripts.
+- **Fix:** the manual one-time DNS verify/cleanup hooks are now **committed repo files** — [`scripts/Wait-AcmeDnsRecord.ps1`](scripts/Wait-AcmeDnsRecord.ps1) and [`scripts/Clear-AcmeDnsRecord.ps1`](scripts/Clear-AcmeDnsRecord.ps1) — that `generate-cert.ps1` **downloads** (GitHub Pages, raw fallback) and `Unblock-File`s, exactly like the existing `scripts/*.ps1` helpers. The main script no longer writes any executable PowerShell at runtime, and the embedded code-as-string block is gone, so it no longer trips behavioral AV. Tunables (`WaitMinutes` / `PollSeconds` / `QuorumPublic`) are passed as named script parameters via win-acme `--dnscreatescriptarguments`.
+- **Also:** the polling loop is now a **bounded deadline loop** (default ceiling 12 h, configurable) instead of `while ($true)` — same "never fail early, keep waiting" behavior, without the infinite-loop heuristic. The authoritative-NS + public-resolver verification logic is unchanged.
+
 ## [0.1.37] — 2026-06-29
 
 ### Added (`generate-cert.ps1` — generate + export, no IIS)
