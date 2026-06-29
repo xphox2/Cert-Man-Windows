@@ -327,6 +327,14 @@ function Invoke-GenerateOne {
         Write-Host '   then press Enter - win-acme re-checks PUBLIC DNS and waits until the record is visible before' -ForegroundColor Yellow
         Write-Host '   asking Let''s Encrypt to validate, so it will not fail if propagation is slow. No renewal task (one-time).' -ForegroundColor Yellow
     }
+    if ($s.Manual -or $s.AutoVerify) {
+        Write-Host ''
+        Write-Host '   >>> CREATE THE RECORD AT THE NAME win-acme LABELS "Record:" (it starts with _acme-challenge...) <<<' -ForegroundColor Magenta
+        Write-Host '       NOT the "Domain:" line above it. e.g. for *.dimp.xphox.com the TXT host is' -ForegroundColor Magenta
+        Write-Host '       _acme-challenge.dimp.xphox.com  (the "Content" value is the TXT value).' -ForegroundColor Magenta
+        Write-Host '       Most DNS panels want the host RELATIVE to the zone: enter "_acme-challenge.dimp"' -ForegroundColor Magenta
+        Write-Host '       (the panel appends the zone) - do NOT enter the full FQDN, and do NOT enter just "dimp".' -ForegroundColor Magenta
+    }
     elseif ($s.Manual) { Write-Host '   MANUAL DNS: win-acme prints a TXT record; this cert will NOT auto-renew.' -ForegroundColor Yellow }
 
     # --- PFX export (the whole point of this script - always on) ------------

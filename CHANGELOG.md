@@ -2,6 +2,11 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.41] — 2026-06-29
+
+### Changed (`generate-cert.ps1` — warn which name the TXT record goes under)
+- A real run failed validation because the TXT was created at `dimp.xphox.com` instead of `_acme-challenge.dimp.xphox.com` — win-acme prints both a `Domain:` line (the identifier) and a `Record:` line (the actual FQDN for the TXT), and the `Domain:` line was used by mistake. The authoritative nameservers correctly returned NXDOMAIN for the right name, so it could never validate. For manual / auto-verify methods the script now prints a prominent reminder **before issuance** to create the record at the **`Record:` name (the `_acme-challenge…` one), not the `Domain:` line**, and that most DNS panels want the host **relative to the zone** (e.g. `_acme-challenge.dimp`, not the full FQDN and not just `dimp`). No behavior change; guidance only.
+
 ## [0.1.40] — 2026-06-29
 
 ### Changed (`generate-cert.ps1` — make clear the production prompt is where DNS records appear)
