@@ -130,24 +130,31 @@ function Get-WinAcmeDnsProviders {
             'linode', 'luadns', 'ns1', 'rfc2136', 'route53', 'simply', 'tencent', 'transip')
     }
 }
-function Get-ManualVerifyScripts {
-    # Download (do NOT generate) the manual DNS verify + cleanup hooks. We never write executable
-    # PowerShell at runtime - they are committed repo files - so this script does not behave like a
-    # "dropper" that antivirus / behavior monitoring would flag. Returns the on-disk paths.
-    $base = 'https://xphox2.github.io/Cert-Man-Windows/scripts'
-    $raw  = 'https://raw.githubusercontent.com/xphox2/Cert-Man-Windows/main/scripts'
-    $out = @{}
-    foreach ($name in 'Wait-AcmeDnsRecord.ps1', 'Clear-AcmeDnsRecord.ps1') {
-        $dest = Join-Path $WinAcmePath $name
-        $ok = $false
-        foreach ($u in "$base/$name", "$raw/$name") {
-            try { Get-File $u $dest; if ((Test-Path $dest) -and (Get-Item $dest).Length -gt 0) { $ok = $true; break } } catch {}
-        }
-        if (-not $ok) { throw "Could not download $name from the Cert-Man-Windows repo." }
-        Unblock-File $dest -ErrorAction SilentlyContinue
-        $out[$name] = $dest
+function Set-WinAcmePreValidation {
+    # Tune win-acme's BUILT-IN DNS pre-validation so manual issuance waits for propagation and
+    # checks PUBLIC resolvers (not the local cache). After you press Enter, win-acme resolves the
+    # zone's authoritative nameservers (via these public servers) and re-checks the TXT every
+    # interval up to RetryCount times BEFORE asking Let's Encrypt to validate - so it does not
+    # submit (and cannot fail) until the record is actually visible. No scripts are written.
+    param([int]$WaitMinutes = 30)
+    $wacs = Join-Path $WinAcmePath 'wacs.exe'
+    $cfg  = Join-Path $WinAcmePath 'settings.json'
+    if (-not (Test-Path $cfg)) { try { & $wacs --version 2>&1 | Out-Null } catch {} }  # first run creates it
+    $interval = 30
+    $retries  = [math]::Max(4, [int]([math]::Ceiling(($WaitMinutes * 60) / $interval)))
+    $servers  = @('8.8.8.8', '1.1.1.1', '9.9.9.9', '8.8.4.4')
+    try {
+        $j = if (Test-Path $cfg) { Get-Content $cfg -Raw | ConvertFrom-Json } else { [pscustomobject]@{ Validation = [pscustomobject]@{} } }
+        if (-not $j.Validation) { $j | Add-Member -NotePropertyName Validation -NotePropertyValue ([pscustomobject]@{}) -Force }
+        $j.Validation.PreValidateDns = $true
+        $j.Validation.PreValidateDnsRetryCount = $retries
+        $j.Validation.PreValidateDnsRetryInterval = $interval
+        $j.Validation.DnsServers = $servers
+        ($j | ConvertTo-Json -Depth 20) | Set-Content -Path $cfg -Encoding utf8
+        return [pscustomobject]@{ Ok = $true; Retries = $retries; Interval = $interval; Servers = $servers }
+    } catch {
+        return [pscustomobject]@{ Ok = $false; Error = $_.Exception.Message }
     }
-    return [pscustomobject]@{ Create = $out['Wait-AcmeDnsRecord.ps1']; Delete = $out['Clear-AcmeDnsRecord.ps1'] }
 }
 
 function Get-DnsValidation {
@@ -159,9 +166,9 @@ function Get-DnsValidation {
     Write-Host '     3) Azure DNS' -ForegroundColor White
     Write-Host '     4) GoDaddy' -ForegroundColor White
     Write-Host "     5) Other provider - choose from win-acme's full DNS list" -ForegroundColor White
-    Write-Host '     6) Manual         - one-off; you press Enter (win-acme checks once - can fail if not yet propagated)' -ForegroundColor White
-    Write-Host '     7) Manual + auto-verify (ONE-TIME) - you add ONE TXT record; it waits & checks public +' -ForegroundColor White
-    Write-Host '                          authoritative DNS until verified, never fails early. No renewal task.' -ForegroundColor White
+    Write-Host '     6) Manual         - one-off; win-acme shows the TXT, you press Enter (default ~5 min DNS wait)' -ForegroundColor White
+    Write-Host '     7) Manual + auto-verify (ONE-TIME) - win-acme shows the TXT record(s); after you add them it' -ForegroundColor White
+    Write-Host '                          polls PUBLIC DNS until visible (waits longer, will not submit early). No renewal task.' -ForegroundColor White
     switch (Read-Host '   Choose 1-7') {
         '1' {
             $srv = Read-Host '   acme-dns server URL (e.g. https://auth.acme-dns.io to test, or your own)'
@@ -184,13 +191,16 @@ function Get-DnsValidation {
         }
         '6' { return @{ Args = @('--validation', 'manual'); Plugin = $null; Interactive = $true; Label = 'Manual'; Manual = $true } }
         '7' {
-            $wm = Read-Host '   Max minutes to check before re-warning (default 60 - it NEVER hard-fails, just keeps waiting)'
-            $wait = if ($wm -match '^[0-9]+$' -and [int]$wm -gt 0) { [int]$wm } else { 60 }
-            try { $sc = Get-ManualVerifyScripts } catch { Write-Host "   $($_.Exception.Message)" -ForegroundColor Yellow; return $null }
-            $vargs = @('--validationmode', 'dns-01', '--validation', 'script',
-                '--dnscreatescript', $sc.Create, '--dnscreatescriptarguments', "-RecordName {RecordName} -Token {Token} -WaitMinutes $wait -PollSeconds 20 -QuorumPublic 3",
-                '--dnsdeletescript', $sc.Delete, '--dnsdeletescriptarguments', '-RecordName {RecordName}')
-            return @{ Args = $vargs; Plugin = $null; Interactive = $true; Label = "Manual + auto-verify (one-time, waits up to ${wait}m/cycle)"; Manual = $true; OneTime = $true; AutoVerify = $true }
+            $wm = Read-Host '   Minutes to wait for DNS propagation after you press Enter (default 30)'
+            $wait = if ($wm -match '^[0-9]+$' -and [int]$wm -gt 0) { [int]$wm } else { 30 }
+            $pv = Set-WinAcmePreValidation -WaitMinutes $wait
+            if ($pv.Ok) {
+                Write-Host ("   win-acme will re-check PUBLIC DNS ({0}) every {1}s, up to {2} times (~{3} min)," -f ($pv.Servers -join ', '), $pv.Interval, $pv.Retries, $wait) -ForegroundColor DarkGray
+                Write-Host '   and only ask Let''s Encrypt to validate once the TXT record is actually visible.' -ForegroundColor DarkGray
+            } else {
+                Write-Host ("   Could not tune pre-validation ({0}); win-acme will use its defaults (~5 min)." -f $pv.Error) -ForegroundColor Yellow
+            }
+            return @{ Args = @('--validation', 'manual'); Plugin = $null; Interactive = $true; Label = "Manual + auto-verify (one-time, waits ~${wait}m for DNS)"; Manual = $true; OneTime = $true; AutoVerify = $true }
         }
         default { return $null }
     }
@@ -294,6 +304,10 @@ function Invoke-GenerateOne {
 
     Write-Host ''
     Status 'NEED' ("Certificate:  {0}" -f $title) ("DNS zone(s): {0}" -f ($zones -join ', '))
+    if ($Sans.Count -gt 1) {
+        Write-Host ("   This is ONE certificate covering all {0} name(s) above (a single multi-SAN cert)." -f $Sans.Count) -ForegroundColor DarkGray
+        Write-Host '   DNS-01 requires one TXT record per name, so win-acme will ask for several - that is normal.' -ForegroundColor DarkGray
+    }
     if ($zones.Count -gt 1) {
         Write-Host '   This cert spans more than one DNS zone. The DNS method you pick must be able to' -ForegroundColor Yellow
         Write-Host '   create the _acme-challenge record in EVERY zone above (or use Manual / acme-dns).' -ForegroundColor Yellow
@@ -309,9 +323,9 @@ function Invoke-GenerateOne {
     }
     if ($s.AcmeDns) { Write-Host '   acme-dns: win-acme prints a one-time CNAME to create at your registrar; then renewals are automatic.' -ForegroundColor Yellow }
     if ($s.AutoVerify) {
-        Write-Host '   ONE-TIME auto-verify: win-acme shows a TXT record; you add it ONCE. The helper then polls' -ForegroundColor Yellow
-        Write-Host '   public + authoritative DNS and only proceeds when verified - it will NOT fail early, so the' -ForegroundColor Yellow
-        Write-Host '   token never changes and you never have to re-edit DNS. No renewal task is created (one-time).' -ForegroundColor Yellow
+        Write-Host '   ONE-TIME auto-verify: for EACH name, win-acme prints a TXT record to create. Add it at your DNS,' -ForegroundColor Yellow
+        Write-Host '   then press Enter - win-acme re-checks PUBLIC DNS and waits until the record is visible before' -ForegroundColor Yellow
+        Write-Host '   asking Let''s Encrypt to validate, so it will not fail if propagation is slow. No renewal task (one-time).' -ForegroundColor Yellow
     }
     elseif ($s.Manual) { Write-Host '   MANUAL DNS: win-acme prints a TXT record; this cert will NOT auto-renew.' -ForegroundColor Yellow }
 
@@ -401,7 +415,7 @@ function Invoke-GenerateOne {
     Write-Host ("  === Generating: {0} ===" -f $title) -ForegroundColor Cyan
     if ($s.Interactive) {
         if ($s.AcmeDns) { Write-Host '  >>> acme-dns: follow win-acme''s prompts (it uses your one-time CNAME). <<<' -ForegroundColor Yellow }
-        elseif ($s.AutoVerify) { Write-Host '  >>> Watch below: add the ONE TXT record shown, then leave it - it auto-continues once DNS is verified. <<<' -ForegroundColor Yellow }
+        elseif ($s.AutoVerify) { Write-Host '  >>> For each name: add the TXT record win-acme shows, then press Enter. It waits for public DNS, then issues. <<<' -ForegroundColor Yellow }
         elseif ($s.Manual) { Write-Host '  >>> Manual: win-acme will show a TXT record; add it at your DNS, wait ~1 min, follow the prompt. <<<' -ForegroundColor Yellow }
         else { Write-Host "  >>> $($s.Label): enter the provider's credentials when win-acme prompts. <<<" -ForegroundColor Yellow }
         & $wacs @a

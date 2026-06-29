@@ -2,6 +2,14 @@
 
 All notable changes to this operations handbook are documented here. Newest entries on top.
 
+## [0.1.39] — 2026-06-29
+
+### Fixed (`generate-cert.ps1` option 7 — no TXT shown / no success / "prompts individually")
+- **Root cause (verified against a live win-acme install):** the one-time method used win-acme's `--validation script` plugin, which runs the create script as a **hidden subprocess whose console output win-acme does not surface** — so the operator never saw the TXT record to add and never saw a success/verify message. It looked like it did nothing.
+- **Rewrote option 7 to use win-acme's NATIVE `--validation manual`**, which **prints each TXT record to the console** (`Record: _acme-challenge.… / Type: TXT / Please press <Enter>…`), combined with win-acme's **built-in DNS pre-validation** tuned via `settings.json`: `DnsServers` set to **public resolvers** (8.8.8.8 / 1.1.1.1 / 9.9.9.9 / 8.8.4.4), `PreValidateDns=true`, and `PreValidateDnsRetryCount`/`Interval` sized to the minutes you choose (default 30). After you press Enter, win-acme resolves the zone's **authoritative** nameservers via those public servers and re-checks the TXT every 30 s until it is visible **before** asking Let's Encrypt to validate — so it does not submit (and cannot fail) while propagation is still in flight, and it never reads the local cache. This is simpler, fully visible, and writes no scripts (so it also stays clear of behavioral AV).
+- **Clarified multi-name issuance.** Entering several names (e.g. `domain.com, *.domain.com, *.1.domain.com`) produces **ONE multi-SAN certificate**; DNS-01 requires **one TXT record per name**, so win-acme prompts for several in sequence — that is expected, not separate certs. The script now says so up front.
+- **Removed** the now-unused `scripts/Wait-AcmeDnsRecord.ps1` and `scripts/Clear-AcmeDnsRecord.ps1` (added in 0.1.38) — the validation path no longer generates or downloads any script.
+
 ## [0.1.38] — 2026-06-29
 
 ### Fixed (antivirus / "Block at First Sight" false positive on `generate-cert.ps1`)
